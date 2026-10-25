@@ -1,5 +1,7 @@
 # Art extraction
 
+[Project documentation](../README.md) · [Resource inventory](../docs/resources.md)
+
 `extract_art.py` turns painted reference sheets (JPEGs of pixel art) into clean,
 transparent atlases in `src/world/assets/` and writes their layout to
 `src/world/artLayout.ts`. Every sheet is listed in `art-manifest.json`; the

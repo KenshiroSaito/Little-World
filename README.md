@@ -1,75 +1,34 @@
-# React + TypeScript + Vite
+# Little World
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser self-care game: record small acts of care to grow a pixel-art tree, keep reflections, decorate branches, and dress the tree spirit.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Use Node.js 22 (the version used by the deployment workflow) and npm.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Open the local URL printed by Vite, then choose **Start** or **Continue**. The game saves in the current browser. No server or account setup is required.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Documentation
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- [Feature guide](docs/features.md): every player-facing feature, controls, limits, and the code that implements it.
+- [Code map](docs/code-map.md): UI, game rules, state, rendering modules, and extension points.
+- [Resources](docs/resources.md): art, sprite sheets, dependencies, storage, configuration, and deployment.
+- [Art extraction tools](tools/README.md): rebuild atlases and individual item sprites from the source sheets.
 
-```
+## Checks and builds
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server with hot reload. |
+| `npm run build` | Type-check the app and configuration, then produce `dist/`. |
+| `npm run preview` | Serve the production build locally. |
+| `npm run lint` | Run ESLint. |
+| `npm test` | Run Vitest in watch mode. |
+| `npm test -- --run` | Run the test suite once. |
+
+The GitHub Actions workflow builds pushes to `main` and publishes `dist/` to the `gh-pages` branch. See [deployment resources](docs/resources.md#build-and-deployment).
