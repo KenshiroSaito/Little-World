@@ -1,4 +1,4 @@
-import type { GameAction, GameState } from '../types';
+import { isCustomColor, type GameAction, type GameState } from '../types';
 import { localDate, recordActivity } from '../game/rules';
 import { unlockedColors } from '../game/progression';
 
@@ -25,7 +25,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         delete leafPaint[action.segmentId];
         return { ...state, leafPaint };
       }
-      if (!unlockedColors(state).includes(action.colorId)) return state;
+      if (!isCustomColor(action.colorId) && !unlockedColors(state).includes(action.colorId)) return state;
       return { ...state, leafPaint: { ...state.leafPaint, [action.segmentId]: action.colorId } };
     }
 

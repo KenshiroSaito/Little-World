@@ -1,4 +1,4 @@
-import { ACTIVITY_IDS, MOOD_TAGS, type GameState, type SelfCareLog } from '../types';
+import { ACTIVITY_IDS, MOOD_TAGS, isCustomColor, type GameState, type SelfCareLog } from '../types';
 
 export const SAVE_KEY = 'littleworld:save';
 const COLOR_IDS: readonly string[] = ['base', ...ACTIVITY_IDS];
@@ -25,7 +25,7 @@ export function isValidGameState(v: unknown): v is GameState {
   if (!Array.isArray(v.selfCareLogs) || !v.selfCareLogs.every(logValid)) return false;
   const logs = v.selfCareLogs as SelfCareLog[];
   if (new Set(logs.map(l => l.id)).size !== logs.length) return false;
-  if (!object(v.leafPaint) || !Object.values(v.leafPaint).every(c => COLOR_IDS.includes(c as string))) return false;
+  if (!object(v.leafPaint) || !Object.values(v.leafPaint).every(c => COLOR_IDS.includes(c as string) || isCustomColor(c))) return false;
   const { spirit, settings } = v;
   if (!object(spirit) || typeof spirit.enabled !== 'boolean' || !Number.isSafeInteger(spirit.lastShownLogCount) ||
       !(spirit.lastShownDate === null || typeof spirit.lastShownDate === 'string')) return false;

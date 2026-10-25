@@ -1,7 +1,7 @@
 import type { Segment } from '../types.ts'
 import { drawHouse, type House } from './houses.ts'
 import { SAPLING, TILE, WORLD_H, WORLD_W, tileToPx, type Point } from './layout.ts'
-import { BARK, LEAF, ROOT, packHex } from './palette.ts'
+import { BARK, ROOT, leafShades, packHex } from './palette.ts'
 import { hashString, mulberry32 } from './rng.ts'
 import { hexRgb, leafCluster, rootFlare, twigHangs, twigSprite, type TreeKit, type Wood } from './treeKit.ts'
 import { leafSize, leafVariant, type TreeShape } from './treeShape.ts'
@@ -79,7 +79,7 @@ export function drawTree(tree: CanvasRenderingContext2D, glow: CanvasRenderingCo
   for (const s of d.segments) {
     if (s.kind !== 'branch') continue
     const w = widths.get(s.id) ?? 3
-    const glowColor = hexRgb(LEAF[s.leafColor ?? 'base'].mid)
+    const glowColor = hexRgb(leafShades(s.leafColor ?? 'base').mid)
     strokes.push({ kind: 'bark', a: s.from, b: s.to, w0: w, w1: Math.max(2, Math.round(w * 0.75)), glow: glowColor, glowAmount: freshAmount(s.id) })
     if (progress(s) < LEAF_AT) continue
     for (const sprig of sprigsOf(s, d.level)) {

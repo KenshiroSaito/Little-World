@@ -133,6 +133,15 @@ describe('progression', () => {
     expect(painted.leafPaint[seg]).toBe('base');
     expect(gameReducer(painted, { type: 'paint', segmentId: seg, colorId: null }).leafPaint).toEqual({});
   });
+
+  it('paints with any mixed #rrggbb colour, and keeps it in a valid save', () => {
+    const walked = recordActivity(initialGameState, 'walk', at(1));
+    const seg = buildTree(walked.selfCareLogs)[0].id;
+    const painted = gameReducer(walked, { type: 'paint', segmentId: seg, colorId: '#ff6fa8' });
+    expect(buildTree(painted.selfCareLogs, painted.leafPaint).find(s => s.id === seg)?.leafColor).toBe('#ff6fa8');
+    expect(isValidGameState(painted)).toBe(true);
+    expect(gameReducer(walked, { type: 'paint', segmentId: seg, colorId: '#nope' as `#${string}` })).toBe(walked);
+  });
 });
 
 describe('spirit', () => {
