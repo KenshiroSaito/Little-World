@@ -1,0 +1,161 @@
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.tree-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.tree-canvas.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1d2b22;
+  color: #e8e2d0;
+}
+
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hud-lp {
+  margin-right: auto;
+  font-weight: 600;
+  color: #f2c46d;
+}
+
+.panel {
+  position: absolute;
+  top: 64px;
+  right: 12px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 8px;
+  background: #2a2420;
+  color: #e8e2d0;
+}
+
+.activity-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.reflect-form {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.palette {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+
+.palette button[aria-pressed="true"] {
+  outline: 2px solid #f2c46d;
+}
+
+.spirit-bubble {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  max-width: 280px;
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #e8e2d0;
+  color: #1d2b22;
+}
+
+.title-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #1d2b22;
+  color: #e8e2d0;
+}
+
+.hud-zoom {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.palette .swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.relic-list,
+.inscription-list {
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.relic-list p,
+.inscription-list p {
+  margin: 2px 0;
+}
+
+.mood-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #4a3f5c;
+  font-size: 0.85em;
+}
+
+.demo-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(20, 16, 12, 0.85);
+}
+
+.panel label {
+  display: block;
+  margin: 8px 0;
+}
+
+.spirit-bubble p {
+  margin: 0;
+}
+
+.spirit-bubble button {
+  align-self: flex-start;
+  padding: 2px 8px;
+}
