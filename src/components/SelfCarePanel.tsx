@@ -44,7 +44,7 @@ export default function SelfCarePanel({ onClose }: Props) {
   const reflectForm = (
     <div className="reflect-form">
       <label>
-        One sentence about how you are today
+        One sentence about how you are today (everything here is optional)
         <input value={text} maxLength={MAX_REFLECTION_LENGTH} onChange={(e) => setText(e.target.value)} />
       </label>
       <span className="reflect-count">
@@ -106,9 +106,7 @@ export default function SelfCarePanel({ onClose }: Props) {
                 <ActivityIcon id={a.id} />
                 <div className="activity-text">
                   <strong>{a.label}</strong>
-                  <span>
-                    {a.colorName} leaves{a.id === "reflect" && " · all fields optional"}
-                  </span>
+                  <span>{a.colorName} leaves</span>
                   {times > 0 && <span className="activity-done">✓ Done today{times > 1 ? ` ×${times}` : ""}</span>}
                 </div>
                 {!open && (

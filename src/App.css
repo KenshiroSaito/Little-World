@@ -250,17 +250,6 @@
   right: 16px;
 }
 
-.activity-list button {
-  width: 100%;
-  min-height: 56px;
-  text-align: left;
-  background: #332a23;
-}
-
-.activity-list button:hover:not(:disabled) {
-  background: #3d332b;
-}
-
 .reflect-form .btn-primary {
   width: 100%;
 }
@@ -679,8 +668,17 @@
 
 .activity-text {
   flex: 1;
+  min-width: 0;
   display: grid;
+  gap: 2px;
   line-height: 1.25;
+}
+
+.activity-text strong,
+.activity-text span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .activity-text strong {
@@ -699,8 +697,10 @@
 
 .activity-add {
   flex: none;
+  min-width: 72px;
   min-height: 40px;
   padding: 8px 14px;
+  white-space: nowrap;
 }
 
 .selfcare-panel .reflect-form {
