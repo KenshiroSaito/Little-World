@@ -32,8 +32,18 @@
 
 .hud-lp {
   margin-right: auto;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 6px;
+  border: 1px solid #5f5040;
+  border-radius: 8px;
+  background: #241e19;
   color: #f2c46d;
+  font-family: "VT323", "Courier New", monospace;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 1px;
 }
 
 .panel {
@@ -605,6 +615,154 @@
 }
 
 .keepsake-add:focus-within {
+  outline: 2px solid #f2c46d;
+  outline-offset: 2px;
+}
+
+/* Self-Care panel: one card per activity, Reflect opens in place. */
+.selfcare-panel {
+  width: min(400px, calc(100vw - 24px));
+  padding: 20px;
+  border: 1px solid #5f5040;
+  border-radius: 12px;
+  background: #2a2420;
+}
+
+.selfcare-panel > h2 {
+  margin: 4px 56px 4px 0;
+  color: #f2c46d;
+  font-family: "VT323", "Courier New", monospace;
+  font-size: 40px;
+  font-weight: normal;
+  line-height: 1;
+}
+
+.selfcare-intro {
+  margin: 0 0 14px;
+  color: #cbbda6;
+  font-size: 0.92em;
+}
+
+.selfcare-panel .activity-list {
+  margin: 0;
+  gap: 12px;
+}
+
+.activity-card {
+  padding: 12px 14px;
+  border: 1px solid #5f5040;
+  border-radius: 10px;
+  background: #332a23;
+}
+
+.activity-card.is-open {
+  border: 2px solid #ba68c8;
+  padding: 11px 13px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.activity-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #5f5040;
+  border-radius: 6px;
+  background: #1d1915;
+}
+
+.activity-text {
+  flex: 1;
+  display: grid;
+  line-height: 1.25;
+}
+
+.activity-text strong {
+  color: #f3ecdc;
+}
+
+.activity-text span {
+  color: #cbbda6;
+  font-size: 0.85em;
+}
+
+.activity-text .activity-done {
+  color: #9fe0a0;
+  font-weight: 600;
+}
+
+.activity-add {
+  flex: none;
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.selfcare-panel .reflect-form {
+  margin: 12px 0 0;
+}
+
+.selfcare-panel .reflect-form label {
+  margin: 0;
+  color: #e8e2d0;
+  font-size: 0.9em;
+}
+
+.selfcare-panel .reflect-form input:not([type="file"]) {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+}
+
+.reflect-count {
+  justify-self: end;
+  color: #a8977c;
+  font-size: 0.8em;
+}
+
+.mood-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mood-chip {
+  min-height: 34px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #241e19;
+  font-size: 0.9em;
+}
+
+.mood-chip[aria-pressed="true"] {
+  border-color: #e6b8ee;
+  background: #e6b8ee;
+  color: #2b2117;
+}
+
+.selfcare-panel .reflect-form label.photo-add {
+  position: relative;
+  justify-self: start;
+  padding: 6px 14px;
+  border: 1px dashed #7a6650;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.photo-add input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.photo-add:focus-within {
   outline: 2px solid #f2c46d;
   outline-offset: 2px;
 }

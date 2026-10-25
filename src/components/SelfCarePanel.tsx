@@ -5,6 +5,7 @@ import { MAX_REFLECTION_IMAGES, MAX_REFLECTION_LENGTH } from "../game/rules";
 import { useGame } from "../state/GameProvider";
 import { saveImage } from "../state/images";
 import type { ActivityId, MoodTag } from "../types";
+import ActivityIcon from "./ActivityIcon";
 import { PhotoPreview } from "./ReflectionImages";
 
 type Props = {
@@ -40,75 +41,91 @@ export default function SelfCarePanel({ onClose }: Props) {
     }
   }
 
+  const reflectForm = (
+    <div className="reflect-form">
+      <label>
+        One sentence about how you are today
+        <input value={text} maxLength={MAX_REFLECTION_LENGTH} onChange={(e) => setText(e.target.value)} />
+      </label>
+      <span className="reflect-count">
+        {text.length} / {MAX_REFLECTION_LENGTH}
+      </span>
+      <div className="mood-chips" role="group" aria-label="Mood">
+        {MOODS.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className="mood-chip"
+            aria-pressed={mood === m.id}
+            onClick={() => setMood((current) => (current === m.id ? "" : m.id))}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <label className="photo-add">
+        Add photos ({photos.length}/{MAX_REFLECTION_IMAGES})
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={photos.length >= MAX_REFLECTION_IMAGES}
+          onChange={(e) => {
+            const picked = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+            setPhotos((list) => [...list, ...picked].slice(0, MAX_REFLECTION_IMAGES));
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {photos.length > 0 && (
+        <div className="photo-previews">
+          {photos.map((file, i) => (
+            <PhotoPreview key={`${file.name}-${file.lastModified}-${i}`} file={file} onRemove={() => setPhotos((list) => list.filter((_, j) => j !== i))} />
+          ))}
+        </div>
+      )}
+      {photoError && <p role="alert">Those photos could not be kept on this device. Try again, or save without them.</p>}
+      <p className="reflect-note">Each reflection buries a keepsake at the tip of its root. Find it in Relics.</p>
+      <button className="btn-primary" disabled={saving} onClick={saveReflection}>
+        {saving ? "Saving…" : "Save reflection · +5 LP"}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="panel" role="dialog" aria-label="Self-Care">
+    <div className="panel selfcare-panel" role="dialog" aria-label="Self-Care">
       <h2>Self-Care</h2>
+      <p className="selfcare-intro">Every act of care counts. Nothing is lost when you rest.</p>
       <ul className="activity-list">
         {ACTIVITIES.map((a) => {
           const times = doneToday.filter((id) => id === a.id).length;
+          const open = a.id === "reflect" && reflectOpen;
           return (
-            <li key={a.id}>
-              <button onClick={() => (a.id === "reflect" ? setReflectOpen(true) : recordAndClose(a.id))}>
-                {a.label} · 5 LP · {a.colorName}
-                {times > 0 && ` ✓ done today${times > 1 ? ` ×${times}` : ""}`}
-              </button>
+            <li key={a.id} className={`activity-card${open ? " is-open" : ""}`}>
+              <div className="activity-row">
+                <ActivityIcon id={a.id} />
+                <div className="activity-text">
+                  <strong>{a.label}</strong>
+                  <span>
+                    {a.colorName} leaves{a.id === "reflect" && " · all fields optional"}
+                  </span>
+                  {times > 0 && <span className="activity-done">✓ Done today{times > 1 ? ` ×${times}` : ""}</span>}
+                </div>
+                {!open && (
+                  <button
+                    className="btn-primary activity-add"
+                    onClick={() => (a.id === "reflect" ? setReflectOpen(true) : recordAndClose(a.id))}
+                    aria-label={`Record ${a.label}, plus 5 LP`}
+                  >
+                    +5 LP
+                  </button>
+                )}
+              </div>
+              {open && reflectForm}
             </li>
           );
         })}
       </ul>
-
-      {reflectOpen && (
-        <div className="reflect-form">
-          <label>
-            One sentence about how you are today (optional)
-            <input
-              value={text}
-              maxLength={MAX_REFLECTION_LENGTH}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </label>
-          <span>
-            {text.length}/{MAX_REFLECTION_LENGTH}
-          </span>
-          <label>
-            Mood (optional)
-            <select value={mood} onChange={(e) => setMood(e.target.value as MoodTag | "")}>
-              <option value="">—</option>
-              {MOODS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Photos (optional, up to {MAX_REFLECTION_IMAGES})
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={photos.length >= MAX_REFLECTION_IMAGES}
-              onChange={(e) => {
-                const picked = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
-                setPhotos((list) => [...list, ...picked].slice(0, MAX_REFLECTION_IMAGES));
-                e.target.value = "";
-              }}
-            />
-          </label>
-          {photos.length > 0 && (
-            <div className="photo-previews">
-              {photos.map((file, i) => (
-                <PhotoPreview key={`${file.name}-${file.lastModified}-${i}`} file={file} onRemove={() => setPhotos((list) => list.filter((_, j) => j !== i))} />
-              ))}
-            </div>
-          )}
-          {photoError && <p role="alert">Those photos could not be kept on this device. Try again, or save without them.</p>}
-          <p className="reflect-note">Each reflection buries a keepsake at the tip of its root. Find it in Relics.</p>
-          <button className="btn-primary" disabled={saving} onClick={saveReflection}>
-            {saving ? "Saving…" : "Save reflection"}
-          </button>
-        </div>
-      )}
 
       <button className="btn-icon panel-close" onClick={onClose} aria-label="Close">
         ×

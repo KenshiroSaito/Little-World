@@ -21,7 +21,13 @@ export default function Hud({
 }: Props) {
   return (
     <div className="hud">
-      <span className="hud-lp">{totalLP} LP</span>
+      <span className="hud-lp">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="#7fca4c" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+          <path d="M3 13C3 7 7 3 13 3c0 6-4 10-10 10Z" />
+          <path d="M3 13 9 7" />
+        </svg>
+        {totalLP} LP
+      </span>
       <button className="btn-primary" onClick={() => onOpenPanel("selfCare")}>Self-Care</button>
       <button onClick={onTogglePaint} aria-pressed={paintMode}>
         Paint
