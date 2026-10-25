@@ -1,3 +1,4 @@
+import { validPurchases } from '../shop/inventory';
 import { ACTIVITY_IDS, MOOD_TAGS, isCustomColor, type GameState, type SelfCareLog } from '../types';
 
 export const SAVE_KEY = 'littleworld:save';
@@ -24,6 +25,7 @@ export function isValidGameState(v: unknown): v is GameState {
   if (!object(v) || v.version !== 2) return false;
   if (!Array.isArray(v.selfCareLogs) || !v.selfCareLogs.every(logValid)) return false;
   const logs = v.selfCareLogs as SelfCareLog[];
+  if (v.shopPurchases !== undefined && (!validPurchases(v.shopPurchases) || v.shopPurchases.reduce((sum, p) => sum + p.price, 0) > logs.reduce((sum, log) => sum + log.points, 0))) return false;
   if (new Set(logs.map(l => l.id)).size !== logs.length) return false;
   if (!object(v.leafPaint) || !Object.values(v.leafPaint).every(c => COLOR_IDS.includes(c as string) || isCustomColor(c))) return false;
   const { spirit, settings } = v;

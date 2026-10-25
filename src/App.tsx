@@ -1,3 +1,5 @@
+import ShopPanel from './shop/ShopPanel';
+import { shopBalance } from './shop/inventory';
 import { useRef, useState } from "react";
 import TitleScreen from "./components/TitleScreen";
 import Hud from "./components/Hud";
@@ -14,7 +16,7 @@ import type { CanvasSelection, LeafColor } from "./types";
 import "./App.css";
 
 type Screen = "title" | "tree";
-export type PanelId = "selfCare" | "journal" | "relics" | "settings";
+export type PanelId = "selfCare" | "journal" | "relics" | "settings" | "shop";
 
 /** One paint action, remembered so Undo can put the previous colour back. */
 type PaintStep = { segmentId: string; previous: LeafColor | null };
@@ -32,9 +34,18 @@ export default function App() {
   const [paintColor, setPaintColor] = useState<LeafColor>("base");
   const [paintHistory, setPaintHistory] = useState<PaintStep[]>([]);
 
+  const [placingItem, setPlacingItem] = useState<string | null>(null);
+  const purchases = state.shopPurchases ?? [];
+  const balance = shopBalance(game.totalLP, purchases);
+
   const closePanel = () => setOpenPanel(null);
 
   function handleCanvasSelect(selection: CanvasSelection) {
+    if (placingItem && selection.kind === "segment") {
+      game.dispatch({ type: "placeItem", purchaseId: placingItem, segmentId: selection.id });
+      setPlacingItem(null);
+      return;
+    }
     if (paintMode && selection.kind === "segment") {
       const previous = state.leafPaint[selection.id] ?? null;
       setPaintHistory((steps) => [...steps, { segmentId: selection.id, previous }]);
@@ -54,6 +65,7 @@ export default function App() {
   }
 
   function togglePaint() {
+    setPlacingItem(null);
     setPaintMode((on) => !on);
     setPaintHistory([]);
     closePanel();
@@ -77,15 +89,17 @@ export default function App() {
         revealedRelics={game.revealedRelics.map((relic) => relic.id)}
         inscriptionCount={game.inscriptions.length}
         lp={game.totalLP}
-        paintMode={paintMode}
+        purchases={purchases}
+        paintMode={paintMode || placingItem !== null}
         reducedMotion={state.settings.reducedMotion}
         spiritEnabled={state.spirit.enabled}
       />
 
       <Hud
-        totalLP={game.totalLP}
+        totalLP={balance}
         paintMode={paintMode}
         onOpenPanel={(panel) => {
+          setPlacingItem(null);
           setPaintMode(false);
           setOpenPanel(panel);
         }}
@@ -106,6 +120,18 @@ export default function App() {
         />
       )}
 
+      {openPanel === "shop" && <ShopPanel
+        balance={balance}
+        purchases={purchases}
+        onBuy={itemId => game.dispatch({ type: "buyItem", itemId, id: crypto.randomUUID() })}
+        onPlace={purchaseId => { setPlacingItem(purchaseId); setPaintMode(false); closePanel(); }}
+        onStore={purchaseId => game.dispatch({ type: "placeItem", purchaseId, segmentId: null })}
+        onClose={closePanel}
+      />}
+      {placingItem && <div className="shop-placement" role="status">
+        <span>Click a leafy branch to place your item.</span>
+        <button onClick={() => setPlacingItem(null)}>Cancel</button>
+      </div>}
       {openPanel === "selfCare" && <SelfCarePanel onClose={closePanel} />}
       {openPanel === "journal" && <JournalBook onClose={closePanel} />}
       {openPanel === "relics" && <RelicsPanel onClose={closePanel} />}

@@ -26,6 +26,7 @@ export default function Hud({
       <button onClick={onTogglePaint} aria-pressed={paintMode}>
         Paint
       </button>
+      <button onClick={() => onOpenPanel("shop")}>Shop</button>
       <button onClick={() => onOpenPanel("journal")}>Journal</button>
       <button onClick={() => onOpenPanel("relics")}>Relics</button>
       <button onClick={() => onOpenPanel("settings")}>Settings</button>

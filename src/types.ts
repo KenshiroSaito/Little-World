@@ -1,3 +1,4 @@
+import type { ShopPurchase } from './shop/inventory';
 // Shared types for Little World (spec v2.1).
 // Agreed by A, B and C. Change only after telling the whole team.
 
@@ -36,6 +37,7 @@ export type SelfCareLog = {
 
 export type GameState = {
   version: 2;
+  shopPurchases?: ShopPurchase[];
   selfCareLogs: SelfCareLog[];
   /** segment id -> colour the player painted */
   leafPaint: Record<string, LeafColor>;
@@ -86,6 +88,8 @@ export type GameAction =
   | { type: "setSpiritEnabled"; enabled: boolean }
   | { type: "setReducedMotion"; enabled: boolean }
   | { type: "nextDay" } // demo mode only
+  | { type: "buyItem"; itemId: string; id: string }
+  | { type: "placeItem"; purchaseId: string; segmentId: string | null }
   | { type: "reset" };
 
 /** A -> C: what the player clicked on the canvas. */

@@ -1,3 +1,5 @@
+import { TreeDecorations } from '../shop/decorations';
+import type { ShopPurchase } from '../shop/inventory';
 import type { CanvasSelection, RelicId, Segment } from '../types.ts'
 import { SPIRIT_ANIMS, SPIRIT_CELL } from './artLayout.ts'
 import spiritSheetUrl from './assets/spirit-sheet.png'
@@ -52,6 +54,7 @@ import {
 } from './treeShape.ts'
 
 export type Scene = {
+  purchases?: readonly ShopPurchase[]
   segments: readonly Segment[]
   revealedRelics: readonly RelicId[]
   inscriptionCount: number
@@ -133,6 +136,7 @@ export class WorldRenderer {
   private growth: { ids: Set<string>; start: number } | null = null
   private relicsShown: readonly RelicId[] = []
   private hover: CanvasSelection | null = null
+  private readonly decorations = new TreeDecorations()
   private treeDirty = true
   private overlayDirty = true
 
@@ -237,6 +241,7 @@ export class WorldRenderer {
       this.syncHouses(this.started && !this.needsFit)
       this.treeDirty = true
     }
+    if (JSON.stringify(next.purchases) !== JSON.stringify(prev.purchases)) this.treeDirty = true
     if (next.barkColor !== prev.barkColor) this.treeDirty = true
     if (!this.growth) this.revealRelics(this.started)
     if (!next.paintMode && this.hover?.kind === 'segment') this.hover = null
@@ -461,6 +466,9 @@ export class WorldRenderer {
       level: this.scene.segments.filter((s) => s.kind === 'branch').length,
       lp: this.scene.lp,
       houses: this.houses.map((house) => ({ house, progress: this.houseProgress(house.id, ms) })),
+    })
+    this.decorations.draw(this.layers.tree.getContext('2d')!, this.scene.purchases ?? [], segments, () => {
+      if (!this.disposed) this.treeDirty = true
     })
     paintLight(this.layers.light.getContext('2d')!, computeLight(segments, this.relicsShown, this.ruinLit()))
     this.treeDirty = false

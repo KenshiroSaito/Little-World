@@ -1,5 +1,8 @@
 import { isCustomColor, type GameAction, type GameState } from '../types';
 import { localDate, recordActivity } from '../game/rules';
+import { buyItem } from '../shop/inventory';
+import { buildTree } from '../game/buildTree';
+import { totalLP } from '../game/progression';
 import { unlockedColors } from '../game/progression';
 
 export const initialGameState: GameState = {
@@ -14,6 +17,17 @@ export const initialGameState: GameState = {
 /** Pure: the same state and action always give the same result. Time comes in on the action. */
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'buyItem': {
+      const purchases = buyItem(state.shopPurchases ?? [], totalLP(state), action.itemId, action.id);
+      return purchases ? { ...state, shopPurchases: purchases } : state;
+    }
+
+    case 'placeItem': {
+      if (action.segmentId !== null && !buildTree(state.selfCareLogs).some(s => s.kind === 'branch' && s.id === action.segmentId)) return state;
+      if (!state.shopPurchases?.some(p => p.id === action.purchaseId)) return state;
+      return { ...state, shopPurchases: state.shopPurchases.map(p => p.id === action.purchaseId ? { ...p, segmentId: action.segmentId } : p) };
+    }
+
     case 'record':
       return recordActivity(state, action.activityId, action.now, { text: action.text, mood: action.mood });
 

@@ -1,3 +1,4 @@
+import type { ShopPurchase } from '../shop/inventory';
 // The tree canvas from main's placeholder, with the real renderer behind it.
 // Keep the onSelect prop and the CanvasSelection type so C's App.tsx keeps working.
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
@@ -15,6 +16,7 @@ export type TreeCanvasProps = {
   /** Clicks on a branch segment, a relic or the tablets. */
   onSelect: (selection: CanvasSelection) => void
   /** buildTree output; the bare sapling until B's state is wired in. Compared by content. */
+  purchases?: readonly ShopPurchase[]
   segments?: readonly Segment[]
   /** revealedRelics(state) ids. The ruin lights up once heartwood_relic is in here. */
   revealedRelics?: readonly RelicId[]
@@ -38,6 +40,7 @@ const NONE: readonly never[] = []
 export default function TreeCanvas({
   onSelect,
   segments = NONE,
+  purchases = NONE,
   revealedRelics = NONE,
   inscriptionCount = 0,
   lp = 0,
@@ -63,6 +66,7 @@ export default function TreeCanvas({
   useEffect(() => {
     rendererRef.current?.setScene({
       segments,
+      purchases,
       revealedRelics,
       inscriptionCount,
       lp,
@@ -71,7 +75,7 @@ export default function TreeCanvas({
       reducedMotion,
       spiritEnabled,
     })
-  }, [segments, revealedRelics, inscriptionCount, lp, barkColor, paintMode, reducedMotion, spiritEnabled])
+  }, [purchases, segments, revealedRelics, inscriptionCount, lp, barkColor, paintMode, reducedMotion, spiritEnabled])
 
   useEffect(() => {
     if (rendererRef.current) rendererRef.current.events = { onSelect }
