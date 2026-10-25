@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type Dispatch, type ReactNode } from 'react';
-import type { ActivityId, ColorId, GameAction, GameState, MoodTag, RevealedRelic, Segment, SelfCareLog } from '../types';
+import type { ActivityId, ColorId, GameAction, LeafColor, GameState, MoodTag, RevealedRelic, Segment, SelfCareLog } from '../types';
 import { buildTree } from '../game/buildTree';
 import { getExperienceHistory } from '../game/history';
 import { inscriptions, revealedRelics, ruinReached, totalLP, unlockedColors } from '../game/progression';
@@ -23,7 +23,7 @@ export interface GameContextValue {
   spiritMessage: string | null;
   // Helpers that add the current time, so components never build actions by hand.
   record: (activityId: ActivityId, extras?: { text?: string; mood?: MoodTag }) => void;
-  paintLeaves: (segmentId: string, colorId: ColorId | null) => void;
+  paintLeaves: (segmentId: string, colorId: LeafColor | null) => void;
   markSpiritShown: () => void;
 }
 

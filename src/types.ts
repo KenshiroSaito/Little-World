@@ -12,6 +12,13 @@ export type MoodTag = (typeof MOOD_TAGS)[number];
 /** "base" is unlocked from the start; each activity unlocks its own colour. */
 export type ColorId = "base" | ActivityId;
 
+/** A leaf colour: one of the unlockable colours, or any "#rrggbb" the player mixes. */
+export type LeafColor = ColorId | `#${string}`;
+
+export function isCustomColor(v: unknown): v is `#${string}` {
+  return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+}
+
 export const RELIC_IDS = ["carved_stone", "heartwood_relic"] as const;
 export type RelicId = (typeof RELIC_IDS)[number];
 
@@ -31,7 +38,7 @@ export type GameState = {
   version: 2;
   selfCareLogs: SelfCareLog[];
   /** segment id -> colour the player painted */
-  leafPaint: Record<string, ColorId>;
+  leafPaint: Record<string, LeafColor>;
   spirit: {
     enabled: boolean;
     lastShownLogCount: number;
@@ -51,7 +58,7 @@ export type Segment = {
   parentId: string | null;
   from: { x: number; y: number }; // tile coordinates
   to: { x: number; y: number };
-  leafColor?: ColorId; // branches: painted colour, else the activity's colour
+  leafColor?: LeafColor; // branches: painted colour, else the activity's colour
 };
 
 export type RevealedRelic = {
@@ -73,7 +80,7 @@ export type GameAction =
   | {
       type: "paint";
       segmentId: string;
-      colorId: ColorId | null; // null removes the paint (used for Undo)
+      colorId: LeafColor | null; // null removes the paint (used for Undo)
     }
   | { type: "spiritShown"; now: string }
   | { type: "setSpiritEnabled"; enabled: boolean }

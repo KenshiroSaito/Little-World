@@ -1,4 +1,4 @@
-import type { ColorId, Segment, SelfCareLog } from '../types';
+import type { LeafColor, Segment, SelfCareLog } from '../types';
 
 // Coordinates follow the Segment comment in types.ts: tiles, x to the right of
 // the trunk, y down from the surface (negative is above ground).
@@ -55,7 +55,7 @@ export function rootDepth(records: number): number {
  *   exact for the 20 LP / 40 LP thresholds); on odd records a side root grows
  *   from a random existing root, never deeper than the taproot.
  */
-export function buildTree(logs: readonly SelfCareLog[], leafPaint: Readonly<Record<string, ColorId>> = {}): Segment[] {
+export function buildTree(logs: readonly SelfCareLog[], leafPaint: Readonly<Record<string, LeafColor>> = {}): Segment[] {
   const branches: Segment[] = [];
   const trunk: Segment[] = [];
   const roots: Segment[] = [];
