@@ -32,7 +32,7 @@ import {
 import { computeLight, paintLight } from './lighting.ts'
 import { NPCS, npcFrame, type NpcId } from './npcs.ts'
 import { RELIC_SPRITES, drawOverlay, type OverlayState } from './overlay.ts'
-import { BACKDROP, LEAF, NATURAL_BARK } from './palette.ts'
+import { BACKDROP, LEAF, NATURAL_BARK, leafShades } from './palette.ts'
 import type { Ambient, Rgb } from './particles.ts'
 import { mulberry32 } from './rng.ts'
 import { spiritFrame } from './spirit.ts'
@@ -265,7 +265,7 @@ export class WorldRenderer {
     this.growth = { ids: new Set(fresh.map((s) => s.id)), start: this.scene.reducedMotion ? now - GROW_MS : now }
     const branch = fresh.find((s) => s.kind === 'branch')
     const root = fresh.find((s) => s.kind === 'root')
-    const color = rgb01(LEAF[branch?.leafColor ?? 'base'].mid)
+    const color = rgb01(leafShades(branch?.leafColor ?? 'base').mid)
     if (!this.scene.reducedMotion) {
       if (branch) {
         this.pulse = { at: tileToPx(branch.to), start: now, color }
@@ -344,7 +344,7 @@ export class WorldRenderer {
     const leaves: Ambient[] = []
     for (const s of this.scene.segments) {
       if (s.kind !== 'branch') continue
-      const shades = LEAF[s.leafColor ?? 'base']
+      const shades = leafShades(s.leafColor ?? 'base')
       for (let i = this.scene.lp >= GROWN_LP ? 2 : 1; i > 0; i--) {
         const origin = jitter(tileToPx(s.to), 20)
         leaves.push({ origin, color: rgb01(rand() < 0.5 ? shades.mid : shades.dark), kind: 3, fall: ground - origin.y, size: 3 })
@@ -354,7 +354,7 @@ export class WorldRenderer {
     const list: Ambient[] = [{ origin: jitter(tileToPx({ x: 0, y: -3 }), 20), color: rgb01(LEAF.base.light), kind: 0 }]
     for (const s of this.scene.segments) {
       const p = tileToPx(s.to)
-      if (s.kind === 'branch') list.push({ origin: jitter(p, 26), color: rgb01(LEAF[s.leafColor ?? 'base'].light), kind: 0 })
+      if (s.kind === 'branch') list.push({ origin: jitter(p, 26), color: rgb01(leafShades(s.leafColor ?? 'base').light), kind: 0 })
       else list.push({ origin: jitter(p, 12), color: ROOT_AMBER, kind: 0 })
     }
     if (this.ruinLit()) {

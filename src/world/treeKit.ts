@@ -2,10 +2,10 @@
 // bark to texture-map along segments, root flares, base-green leaf clusters
 // (recoloured per activity, the guide's "colour application" merge) and the
 // four branch types. All the wood can be put in one colour.
-import type { ColorId } from '../types.ts'
+import type { ColorId, LeafColor } from '../types.ts'
 import { TREE_KIT } from './artLayout.ts'
 import kitUrl from './assets/tree-kit.png'
-import { LEAF } from './palette.ts'
+import { leafShades } from './palette.ts'
 import { mulberry32 } from './rng.ts'
 import { makeCanvas, withOutline } from './sprites.ts'
 import type { LeafSize } from './treeShape.ts'
@@ -26,7 +26,9 @@ export type TreeKit = {
 }
 
 // Branch type per leaf colour: oak, willow, pine, fruiting (two variants each in the kit).
+// Mixed colours grow oak, like base.
 const TWIG_TYPE: Record<ColorId, number> = { base: 0, break: 0, reflect: 1, walk: 2, connect: 3 }
+const twigType = (color: LeafColor) => TWIG_TYPE[color as ColorId] ?? 0
 
 export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -155,7 +157,7 @@ const recoloured = new Map<string, HTMLCanvasElement>()
  * Maps a base-green sprite onto a colour's four shades by brightness rank, so
  * every colour keeps the hand-drawn light and shadow. `shift` darkens by steps.
  */
-function recolour(kit: TreeKit, index: number, color: ColorId, shift: number): HTMLCanvasElement {
+function recolour(kit: TreeKit, index: number, color: LeafColor, shift: number): HTMLCanvasElement {
   const key = `${index}:${color}:${shift}`
   const cached = recoloured.get(key)
   if (cached) return cached
@@ -168,7 +170,7 @@ function recolour(kit: TreeKit, index: number, color: ColorId, shift: number): H
   const sorted = [...lums].sort((a, b) => a - b)
   const cut = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]
   const steps = [cut(0.12), cut(0.45), cut(0.82)]
-  const s = LEAF[color]
+  const s = leafShades(color)
   const ramp = [s.outline, s.dark, s.mid, s.light].map(hexRgb)
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] === 0) continue
@@ -193,7 +195,7 @@ const PIECES: Record<LeafSize, number> = { 1: 1, 2: 6, 3: 11, 4: 18 }
  * A bush `size` tiles wide, assembled from kit clusters (back pieces a shade
  * darker) and outlined in the colour's darkest shade. 2px wider than size * 16 + 16.
  */
-export function leafCluster(kit: TreeKit, color: ColorId, size: LeafSize, variant: number): HTMLCanvasElement {
+export function leafCluster(kit: TreeKit, color: LeafColor, size: LeafSize, variant: number): HTMLCanvasElement {
   const key = `${color}:${size}:${variant}`
   const cached = clusters.get(key)
   if (cached) return cached
@@ -213,7 +215,7 @@ export function leafCluster(kit: TreeKit, color: ColorId, size: LeafSize, varian
     const sprite = recolour(kit, p.index, color, i < count / 3 ? 1 : 0)
     ctx.drawImage(sprite, Math.round(side / 2 + p.x - sprite.width / 2), Math.round(side / 2 + p.y - sprite.height / 2))
   })
-  const bush = withOutline(canvas, LEAF[color].outline)
+  const bush = withOutline(canvas, leafShades(color).outline)
   clusters.set(key, bush)
   return bush
 }
@@ -281,8 +283,8 @@ export function rootFlare(wood: Wood, stage: number, stubWidth: number): RootFla
 const flipped = new Map<HTMLCanvasElement, HTMLCanvasElement>()
 
 /** The branch type for a leaf colour, mirrored when the branch leans left. */
-export function twigSprite(wood: Wood, color: ColorId, variant: number, leansLeft: boolean): HTMLCanvasElement {
-  const sprite = wood.twigs[TWIG_TYPE[color] * 2 + (variant & 1)]
+export function twigSprite(wood: Wood, color: LeafColor, variant: number, leansLeft: boolean): HTMLCanvasElement {
+  const sprite = wood.twigs[twigType(color) * 2 + (variant & 1)]
   if (!leansLeft) return sprite
   let mirror = flipped.get(sprite)
   if (!mirror) {
@@ -296,8 +298,8 @@ export function twigSprite(wood: Wood, color: ColorId, variant: number, leansLef
 }
 
 /** Willow strands hang, so that type is centred on the tip instead of standing on it. */
-export function twigHangs(color: ColorId): boolean {
-  return TWIG_TYPE[color] === 1
+export function twigHangs(color: LeafColor): boolean {
+  return twigType(color) === 1
 }
 
 export function hexRgb(hex: string): [number, number, number] {

@@ -1,4 +1,4 @@
-import type { ColorId } from '../types.ts'
+import { isCustomColor, type ColorId, type LeafColor } from '../types.ts'
 
 export type Shades = { outline: string; dark: string; mid: string; light: string }
 
@@ -12,6 +12,49 @@ export const LEAF: Record<ColorId, Shades> = {
   connect: { outline: '#6b2f00', dark: '#c96a00', mid: '#ff9800', light: '#ffd08a' },
   break: { outline: '#00434d', dark: '#008a9c', mid: '#00bcd4', light: '#8eeaf5' },
   reflect: { outline: '#4a1f55', dark: '#8a3f99', mid: '#ba68c8', light: '#e6b8ee' },
+}
+
+const mixed = new Map<string, Shades>()
+
+/**
+ * Shades for any leaf colour. A mixed '#rrggbb' is the `mid`, with the other
+ * three stepped in lightness the way the preset ramps are.
+ */
+export function leafShades(color: LeafColor): Shades {
+  if (!isCustomColor(color)) return LEAF[color]
+  let s = mixed.get(color)
+  if (!s) {
+    const [h, sat, l] = hexHsl(color)
+    s = {
+      outline: hslHex(h, sat, l * 0.32),
+      dark: hslHex(h, sat, l * 0.65),
+      mid: color,
+      light: hslHex(h, sat, l + (1 - l) * 0.5),
+    }
+    mixed.set(color, s)
+  }
+  return s
+}
+
+function hexHsl(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  const [r, g, b] = [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff].map((c) => c / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  const d = max - min
+  if (d === 0) return [0, 0, l]
+  const s = d / (1 - Math.abs(2 * l - 1))
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return [h * 60, s, l]
+}
+
+function hslHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return '#' + [r, g, b].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('')
 }
 
 /** The kit's own bark colour (its root flares' mean), and the tree's colour by default. */
