@@ -1,5 +1,5 @@
 import type { Segment } from '../types.ts'
-import { drawHouse, drawVillager, type House } from './houses.ts'
+import { drawHouse, type House } from './houses.ts'
 import { SAPLING, TILE, WORLD_H, WORLD_W, tileToPx, type Point } from './layout.ts'
 import { BARK, LEAF, ROOT, packHex } from './palette.ts'
 import { hashString, mulberry32 } from './rng.ts'
@@ -23,7 +23,7 @@ export type TreeDraw = {
   level: number
   /** Total LP: leaf clusters grow with it. */
   lp: number
-  /** Tree houses, each built up to `progress` (0 to 1); a villager moves in once it stands. */
+  /** Tree houses, each built up to `progress` (0 to 1). Their residents are the stage's sprites. */
   houses: readonly { house: House; progress: number }[]
 }
 
@@ -56,8 +56,7 @@ const LUSH_LEVEL = 10
  * Redraws the tree layer and its glow layer. Segment geometry is B's; every
  * pixel of wood and leaf comes from the module kit: bark is texture-mapped
  * along each stroke, then the root flare, branch-type twigs, side sprigs and
- * leaf clusters are stamped on, then tree houses and their villagers, then the
- * level sign.
+ * leaf clusters are stamped on, then tree houses, then the level sign.
  */
 export function drawTree(tree: CanvasRenderingContext2D, glow: CanvasRenderingContext2D, kit: TreeKit, d: TreeDraw): void {
   tree.clearRect(0, 0, WORLD_W, WORLD_H)
@@ -137,7 +136,6 @@ export function drawTree(tree: CanvasRenderingContext2D, glow: CanvasRenderingCo
   for (const { house, progress: p } of d.houses) {
     drawHouse(tree, house, d.barkColor, p)
     drawHouse(glow, house, d.barkColor, p, true)
-    if (p >= 1) drawVillager(tree, house)
   }
 
   drawLevelSign(tree, d.level, d.barkColor)

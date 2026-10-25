@@ -1,26 +1,31 @@
 // Tree houses: from 40 LP the tree is big enough to live in, and every record
-// after that builds one more house, with a villager at its door. Placement is
-// pure and stable (a house never moves as the tree grows); drawing is plain
-// pixel art in world pixels, stamped over the leaves so no house is ever hidden.
+// after that builds one more house, with one of the characters on its porch.
+// Placement is pure and stable (a house never moves as the tree grows); drawing
+// is plain pixel art in world pixels, stamped over the leaves so no house is
+// ever hidden. The residents themselves are sprites the stage draws (npcs.ts).
 import type { Segment } from '../types.ts'
 import { WORLD, pxToTile, tileToPx, type Point, type TileRect } from './layout.ts'
+import { NPC_ORDER, type NpcId } from './npcs.ts'
 import { hashString } from './rng.ts'
-import { makeCanvas, withOutline } from './sprites.ts'
 import { hexRgb } from './treeKit.ts'
 import { GROWN_LP } from './treeShape.ts'
 
 /** Every record is worth 5 LP, so one house per record once the tree is grown. */
 const LP_PER_HOUSE = 5
-/** Deck, hut and roof sizes in world pixels. */
-const DECK_W = 46
-const DECK_H = 4
-const HUT_W = 30
-const WALL_H = 20
-const ROOF_H = 12
+/** Deck, hut, roof and strut sizes in world pixels: big enough for the characters who live there. */
+const DECK_W = 70
+const DECK_H = 5
+const HUT_W = 44
+const WALL_H = 30
+const ROOF_H = 18
+const STRUT = 9
+/** The hut sits this far in from the trunk end of the deck; the deck left over outside is the porch. */
+const HUT_INSET = 3
+const PORCH = DECK_W - HUT_W - HUT_INSET
 /** Clear space between houses, and between a deck and the trunk's centre line, in world pixels. */
 const GAP_X = DECK_W + 6
-const GAP_Y = WALL_H + ROOF_H + DECK_H + 8
-const TRUNK_CLEAR = DECK_W / 2 + 14
+const GAP_Y = WALL_H + ROOF_H + DECK_H + 10
+const TRUNK_CLEAR = DECK_W / 2 + 12
 /** Where along a branch a deck may sit, best first, and how level the branch must be. */
 const ALONG = [0.6, 0.75, 0.45, 0.88]
 const MIN_SPAN = 1.5
@@ -31,10 +36,12 @@ export type House = {
   segmentId: string
   /** Deck centre in world pixels; y is where feet stand. */
   at: Point
-  /** 1 when the house is right of the trunk: its door is on the outer side. */
+  /** 1 when the house is right of the trunk: its porch is on the outer side. */
   side: 1 | -1
-  /** Which roof colours and villager. */
+  /** Which roof colours. */
   look: number
+  /** Who lives here. */
+  npc: NpcId
 }
 
 /** Houses `lp` has paid for: one at 40 LP and one more every record after. */
@@ -62,8 +69,14 @@ export function placeHouses(segments: readonly Segment[], lp: number): House[] {
       const spot = findSpot(grown, prefer, used, houses) ?? findSpot(grown, -prefer as 1 | -1, used, houses)
       if (!spot) break
       used.add(spot.segment.id)
-      const look = hashString(spot.segment.id) % LOOKS.length
-      houses.push({ id: `house:${spot.segment.id}`, segmentId: spot.segment.id, at: spot.at, side: spot.side, look })
+      houses.push({
+        id: `house:${spot.segment.id}`,
+        segmentId: spot.segment.id,
+        at: spot.at,
+        side: spot.side,
+        look: hashString(spot.segment.id) % LOOKS.length,
+        npc: NPC_ORDER[houses.length % NPC_ORDER.length],
+      })
       owed--
     }
   }
@@ -89,13 +102,13 @@ function findSpot(branches: readonly Segment[], side: 1 | -1, used: ReadonlySet<
   return null
 }
 
-/** Tile bounds of the houses, roofs and struts included, for framing the tree. */
+/** Tile bounds of the houses, roofs, residents and struts included, for framing the tree. */
 export function houseBounds(houses: readonly House[]): TileRect | null {
   if (houses.length === 0) return null
   const r = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity }
   for (const h of houses) {
-    const a = pxToTile({ x: h.at.x - DECK_W / 2, y: h.at.y - WALL_H - ROOF_H - 4 })
-    const b = pxToTile({ x: h.at.x + DECK_W / 2, y: h.at.y + DECK_H + 7 })
+    const a = pxToTile({ x: h.at.x - DECK_W / 2, y: h.at.y - WALL_H - ROOF_H - 8 })
+    const b = pxToTile({ x: h.at.x + DECK_W / 2, y: h.at.y + DECK_H + STRUT })
     r.left = Math.min(r.left, a.x)
     r.right = Math.max(r.right, b.x)
     r.top = Math.min(r.top, a.y)
@@ -104,17 +117,23 @@ export function houseBounds(houses: readonly House[]): TileRect | null {
   return r
 }
 
-/** Where a house's villager stands, feet on the deck: in front of the door. */
-export function doorstep(h: House): Point {
-  return { x: doorX(h) + 4, y: h.at.y }
+/** Where a house's resident stands: the middle of the porch, x centred, y the row their feet are on. */
+export function npcSpot(h: House): Point {
+  return { x: Math.round(h.at.x + h.side * (DECK_W / 2 - PORCH / 2)), y: h.at.y - 1 }
 }
 
 function hutLeft(h: House): number {
-  return h.at.x - HUT_W / 2 - h.side * 4
+  const left = h.at.x - DECK_W / 2
+  return h.side > 0 ? left + HUT_INSET : left + DECK_W - HUT_INSET - HUT_W
 }
 
+/** The door is in the porch end of the hut, the window towards the trunk. */
 function doorX(h: House): number {
-  return h.side > 0 ? hutLeft(h) + HUT_W - 12 : hutLeft(h) + 4
+  return h.side > 0 ? hutLeft(h) + HUT_W - 19 : hutLeft(h) + 5
+}
+
+function windowX(h: House): number {
+  return h.side > 0 ? hutLeft(h) + 6 : hutLeft(h) + HUT_W - 18
 }
 
 type Look = { roof: string; roofDark: string; wall: string; wallDark: string; trim: string }
@@ -144,67 +163,69 @@ export function drawHouse(ctx: CanvasRenderingContext2D, h: House, wood: string,
   const hutX = hutLeft(h)
   const wallTop = deckTop - WALL_H
   const top = wallTop - ROOF_H - 4
-  const bottom = deckTop + DECK_H + 7
+  const bottom = deckTop + DECK_H + STRUT
   const shown = Math.round((bottom - top) * Math.min(1, progress))
   ctx.save()
   ctx.beginPath()
-  ctx.rect(left - 6, bottom - shown, DECK_W + 12, shown)
+  ctx.rect(left - 8, bottom - shown, DECK_W + 16, shown)
   ctx.clip()
 
   const rect = (x: number, y: number, w: number, hh: number, c: string) => {
     ctx.fillStyle = c
     ctx.fillRect(x, y, w, hh)
   }
-  const winX = h.side > 0 ? hutX + 5 : hutX + HUT_W - 13
+  const winX = windowX(h)
+  const winY = wallTop + 7
   if (glow) {
-    rect(winX, wallTop + 5, 8, 7, WINDOW)
+    rect(winX, winY, 12, 10, WINDOW)
     ctx.restore()
     return
   }
 
-  // Deck: planks across the branch, two struts down to it, and a rail on the outer end.
+  // Deck: planks across the branch, two struts down to it, and a rail round the porch.
   const [r, g, b] = hexRgb(wood)
   const plank = `rgb(${Math.min(255, r + 52)}, ${Math.min(255, g + 40)}, ${Math.min(255, b + 26)})`
   const plankDark = `rgb(${Math.min(255, r + 12)}, ${Math.min(255, g + 8)}, ${b})`
-  for (const sx of [left + 9, left + DECK_W - 11]) {
+  for (const sx of [left + 12, left + DECK_W - 14]) {
     const lean = sx < h.at.x ? 1 : -1
-    for (let i = 0; i < 7; i++) {
-      rect(sx + lean * i - 1, deckTop + DECK_H + i, 4, 1, OUTLINE)
-      rect(sx + lean * i, deckTop + DECK_H + i, 2, 1, plankDark)
+    for (let i = 0; i < STRUT; i++) {
+      rect(sx + lean * i - 1, deckTop + DECK_H + i, 5, 1, OUTLINE)
+      rect(sx + lean * i, deckTop + DECK_H + i, 3, 1, plankDark)
     }
   }
   rect(left - 1, deckTop - 1, DECK_W + 2, DECK_H + 2, OUTLINE)
   rect(left, deckTop, DECK_W, DECK_H, plank)
   rect(left, deckTop + DECK_H - 1, DECK_W, 1, plankDark)
   for (let x = left + 6; x < left + DECK_W; x += 7) rect(x, deckTop, 1, DECK_H - 1, plankDark)
-  const railX = h.side > 0 ? left + DECK_W - 2 : left
-  rect(railX - 1, deckTop - 9, 4, 9, OUTLINE)
-  rect(railX, deckTop - 8, 2, 8, plank)
+  const railX = h.side > 0 ? left + DECK_W - 3 : left
+  rect(railX - 1, deckTop - 12, 5, 12, OUTLINE)
+  rect(railX, deckTop - 11, 3, 11, plank)
   const railFrom = h.side > 0 ? hutX + HUT_W : left
   const railTo = h.side > 0 ? left + DECK_W : hutX
-  rect(railFrom, deckTop - 9, railTo - railFrom, 3, OUTLINE)
-  rect(railFrom, deckTop - 8, railTo - railFrom, 1, plank)
+  rect(railFrom, deckTop - 12, railTo - railFrom, 3, OUTLINE)
+  rect(railFrom, deckTop - 11, railTo - railFrom, 1, plank)
 
   // Walls with boards, a door and a lit window.
   rect(hutX - 1, wallTop - 1, HUT_W + 2, WALL_H + 1, OUTLINE)
   rect(hutX, wallTop, HUT_W, WALL_H, look.wall)
-  for (let y = wallTop + 4; y < deckTop; y += 5) rect(hutX, y, HUT_W, 1, look.wallDark)
-  rect(h.side > 0 ? hutX : hutX + HUT_W - 2, wallTop, 2, WALL_H, look.wallDark)
+  for (let y = wallTop + 5; y < deckTop; y += 6) rect(hutX, y, HUT_W, 1, look.wallDark)
+  rect(h.side > 0 ? hutX : hutX + HUT_W - 3, wallTop, 3, WALL_H, look.wallDark)
   const dx = doorX(h)
-  rect(dx - 1, deckTop - 14, 10, 14, OUTLINE)
-  rect(dx, deckTop - 13, 8, 13, DOOR)
-  rect(dx + 1, deckTop - 12, 6, 1, look.trim)
-  rect(winX - 1, wallTop + 4, 10, 9, OUTLINE)
-  rect(winX, wallTop + 5, 8, 7, WINDOW)
-  rect(winX + 1, wallTop + 5, 2, 2, WINDOW_LIT)
-  rect(winX + 3, wallTop + 5, 1, 7, OUTLINE)
-  rect(winX, wallTop + 8, 8, 1, OUTLINE)
-  rect(winX - 1, wallTop + 13, 10, 2, look.trim)
+  rect(dx - 1, deckTop - 23, 16, 23, OUTLINE)
+  rect(dx, deckTop - 22, 14, 22, DOOR)
+  rect(dx + 2, deckTop - 20, 10, 1, look.trim)
+  rect(h.side > 0 ? dx + 3 : dx + 10, deckTop - 11, 1, 2, look.trim)
+  rect(winX - 1, winY - 1, 14, 12, OUTLINE)
+  rect(winX, winY, 12, 10, WINDOW)
+  rect(winX + 1, winY + 1, 3, 3, WINDOW_LIT)
+  rect(winX + 6, winY, 1, 10, OUTLINE)
+  rect(winX, winY + 5, 12, 1, OUTLINE)
+  rect(winX - 1, winY + 11, 14, 2, look.trim)
 
   // A pitched roof with an overhang, lit on the left.
   const cx = hutX + HUT_W / 2
   for (let i = 0; i < ROOF_H; i++) {
-    const half = Math.round(((HUT_W + 10) / 2) * (1 - i / ROOF_H))
+    const half = Math.round(((HUT_W + 12) / 2) * (1 - i / ROOF_H))
     const y = wallTop - 1 - i
     rect(cx - half - 1, y, half * 2 + 2, 1, OUTLINE)
     if (half > 1) {
@@ -213,61 +234,11 @@ export function drawHouse(ctx: CanvasRenderingContext2D, h: House, wood: string,
     }
   }
   rect(cx - 1, wallTop - ROOF_H - 1, 2, 1, OUTLINE)
-  rect(hutX - 5, wallTop - 2, HUT_W + 10, 1, look.roofDark)
-  rect(hutX - 6, wallTop - 1, HUT_W + 12, 1, OUTLINE)
+  rect(hutX - 6, wallTop - 2, HUT_W + 12, 1, look.roofDark)
+  rect(hutX - 7, wallTop - 1, HUT_W + 14, 1, OUTLINE)
   // A chimney on the trunk side.
-  const chimney = h.side > 0 ? hutX + 5 : hutX + HUT_W - 9
-  rect(chimney - 1, wallTop - ROOF_H + 1, 6, 8, OUTLINE)
-  rect(chimney, wallTop - ROOF_H + 2, 4, 7, look.trim)
-  ctx.restore()
-}
-
-type Folk = { skin: string; hair: string; shirt: string; legs: string }
-
-/** One villager per look, so neighbours never dress alike. */
-const FOLK: Folk[] = [
-  { skin: '#f2c9a0', hair: '#5a3a24', shirt: '#3f6fb5', legs: '#4a3022' },
-  { skin: '#c68e5c', hair: '#2a2630', shirt: '#c4473a', legs: '#3b3a48' },
-  { skin: '#e8b98a', hair: '#d08a2e', shirt: '#4f8f3a', legs: '#5a3a24' },
-  { skin: '#8d5a36', hair: '#2a2630', shirt: '#e8c45a', legs: '#284a7e' },
-  { skin: '#f5d3b0', hair: '#9a9aa6', shirt: '#7b4fa3', legs: '#3b3a48' },
-  { skin: '#b97a4a', hair: '#4a3022', shirt: '#2f8c8c', legs: '#4a3022' },
-]
-const villagers = new Map<number, HTMLCanvasElement>()
-
-/** A villager facing right, outlined: 9 by 15 world pixels, feet on the second row from the bottom. */
-function villagerSprite(look: number): HTMLCanvasElement {
-  const cached = villagers.get(look)
-  if (cached) return cached
-  const f = FOLK[look % FOLK.length]
-  const { canvas, ctx } = makeCanvas(7, 13)
-  const rect = (x: number, y: number, w: number, hh: number, c: string) => {
-    ctx.fillStyle = c
-    ctx.fillRect(x, y, w, hh)
-  }
-  rect(1, 0, 5, 2, f.hair)
-  rect(1, 2, 5, 3, f.skin)
-  rect(1, 2, 1, 3, f.hair)
-  rect(4, 3, 1, 1, OUTLINE)
-  rect(1, 5, 5, 5, f.shirt)
-  rect(0, 6, 1, 3, f.skin)
-  rect(6, 6, 1, 3, f.skin)
-  rect(1, 10, 2, 3, f.legs)
-  rect(4, 10, 2, 3, f.legs)
-  const sprite = withOutline(canvas, OUTLINE)
-  villagers.set(look, sprite)
-  return sprite
-}
-
-/** Draws a house's villager on its doorstep, facing away from the trunk. */
-export function drawVillager(ctx: CanvasRenderingContext2D, h: House): void {
-  const sprite = villagerSprite(h.look)
-  const at = doorstep(h)
-  const x = Math.round(at.x - sprite.width / 2)
-  const y = h.at.y - sprite.height
-  ctx.save()
-  ctx.translate(h.side > 0 ? x : x + sprite.width, y)
-  ctx.scale(h.side, 1)
-  ctx.drawImage(sprite, 0, 0)
+  const chimney = h.side > 0 ? hutX + 7 : hutX + HUT_W - 13
+  rect(chimney - 1, wallTop - ROOF_H + 1, 8, 11, OUTLINE)
+  rect(chimney, wallTop - ROOF_H + 2, 6, 10, look.trim)
   ctx.restore()
 }

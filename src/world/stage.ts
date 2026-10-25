@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SPIRIT_ANIMS, SPIRIT_CELL } from './artLayout.ts'
 import { deviceOffset, deviceScale, worldToScreen, type Camera, type View } from './camera.ts'
 import { WORLD_COLS, WORLD_H, WORLD_ROWS, WORLD_W, type Point } from './layout.ts'
+import { NPCS, type NpcId } from './npcs.ts'
 import { BACKDROP } from './palette.ts'
 import { Particles, type Rgb } from './particles.ts'
 import { COMPOSITE_FRAG, DARKNESS_FRAG, QUAD_VERT, SPIRIT_FRAG } from './shaders.ts'
@@ -38,6 +39,8 @@ export type StageFrame = {
   pulse: { at: Point; start: number; color: Rgb } | null
   /** Ruin glow: 0 or 1, its centre, and seconds since the reveal. */
   ruin: { strength: number; at: Point; since: number }
+  /** Tree-house residents: a sheet cell, and where they stand (x centred, y the row their feet are on). */
+  npcs: readonly { npc: NpcId; row: number; frame: number; x: number; feetY: number; flip: boolean }[]
   /** 0 at the surface to 1 deep underground. */
   depth: number
   bloom: number
@@ -45,6 +48,8 @@ export type StageFrame = {
 }
 
 const SPIRIT_LIGHT_TILES = 4.5
+/** Most residents drawn at once; a tree has room for far fewer houses. */
+const NPC_POOL = 32
 
 /**
  * The three.js side of the renderer: the world layers as nearest-filtered
@@ -66,6 +71,8 @@ export class Stage {
   private readonly finalComposer: EffectComposer
   private readonly composite: ShaderPass
   private sheet: THREE.Texture | null = null
+  private readonly npcMeshes: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = []
+  private npcSheets: Partial<Record<NpcId, THREE.Texture>> = {}
 
   constructor(canvas: HTMLCanvasElement, layers: Layers) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
@@ -131,6 +138,13 @@ export class Stage {
       this.sprites.push(mesh)
     }
 
+    // Residents stand on their porches in daylight, over the darkness and the overlay.
+    for (let i = 0; i < NPC_POOL; i++) {
+      const mesh = spriteMesh(1, 1, 0, 3.5)
+      this.main.add(mesh)
+      this.npcMeshes.push(mesh)
+    }
+
     this.bloomComposer = new EffectComposer(this.renderer)
     this.bloomComposer.renderToScreen = false
     this.bloomComposer.addPass(new RenderPass(this.glowScene, this.camera))
@@ -168,6 +182,12 @@ export class Stage {
     for (const m of this.sprites) m.material.uniforms.tSheet.value = t
   }
 
+  setNpcSheets(images: Record<NpcId, HTMLImageElement>): void {
+    for (const [npc, image] of Object.entries(images) as [NpcId, HTMLImageElement][]) {
+      this.npcSheets[npc] = sheetTexture(image)
+    }
+  }
+
   markDirty(...names: LayerName[]): void {
     for (const n of names) this.textures[n].needsUpdate = true
   }
@@ -198,6 +218,7 @@ export class Stage {
     this.particles.update(f.time, k, f.motion)
     this.leaves.update(f.time, k, f.motion)
     this.updateSpirit(f)
+    this.updateNpcs(f)
 
     const u = this.composite.uniforms
     const toUv = (p: Point) => {
@@ -229,11 +250,31 @@ export class Stage {
     this.leaves.dispose()
     for (const t of Object.values(this.textures)) t.dispose()
     this.sheet?.dispose()
+    for (const t of Object.values(this.npcSheets)) t.dispose()
     this.main.traverse(disposeMesh)
     this.glowScene.traverse(disposeMesh)
     this.renderer.dispose()
   }
 
+
+  private updateNpcs(f: StageFrame) {
+    this.npcMeshes.forEach((mesh, i) => {
+      const a = f.npcs[i]
+      const texture = a && this.npcSheets[a.npc]
+      mesh.visible = Boolean(texture)
+      if (!a || !texture) return
+      const { w, h } = NPCS[a.npc].cell
+      const image = texture.image as HTMLImageElement
+      const uni = mesh.material.uniforms
+      uni.tSheet.value = texture
+      uni.uFrame.value.set((a.frame * w) / image.width, 1 - ((a.row + 1) * h) / image.height, w / image.width, h / image.height)
+      uni.uFlip.value = a.flip ? 1 : 0
+      mesh.scale.set(w, h, 1)
+      const left = Math.round(a.x - w / 2)
+      const top = a.feetY - h + 1
+      mesh.position.set(left + w / 2, -(top + h / 2), 0)
+    })
+  }
 
   private updateSpirit(f: StageFrame) {
     const s = f.spirit

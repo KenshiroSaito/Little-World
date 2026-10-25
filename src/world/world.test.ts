@@ -15,7 +15,8 @@ import { FIXTURE_SEGMENTS } from './fixtures.ts'
 import { hitTest } from './hitTest.ts'
 import { RELIC_TILES, RUIN, STONE_TOP, TABLET, WORLD, WORLD_COLS, WORLD_H, WORLD_W } from './layout.ts'
 import { computeLight } from './lighting.ts'
-import { houseCount, placeHouses } from './houses.ts'
+import { houseCount, npcSpot, placeHouses } from './houses.ts'
+import { NPCS, NPC_ORDER, npcFrame } from './npcs.ts'
 import { GROWN_LP, analyzeTree, growSegments, leafSize, segmentBounds, treeGrowth } from './treeShape.ts'
 import { resizedColumns, solidColumns } from './treeKit.ts'
 
@@ -139,8 +140,36 @@ describe('tree houses', () => {
     expect(new Set(houses.map((h) => h.segmentId)).size).toBe(houses.length)
     for (const a of houses) {
       for (const b of houses) {
-        if (a !== b) expect(Math.abs(a.at.x - b.at.x) >= 52 || Math.abs(a.at.y - b.at.y) >= 44).toBe(true)
+        // A deck's width plus a gap apart, or a whole house (roof to struts) plus a gap.
+        if (a !== b) expect(Math.abs(a.at.x - b.at.x) >= 76 || Math.abs(a.at.y - b.at.y) >= 63).toBe(true)
       }
+    }
+  })
+
+  it('moves the four characters in, one per house, then round again', () => {
+    const houses = placeHouses(records(16), 80)
+    expect(houses.map((h) => h.npc)).toEqual(houses.map((_, i) => NPC_ORDER[i % NPC_ORDER.length]))
+    expect(new Set(houses.slice(0, 4).map((h) => h.npc)).size).toBe(Math.min(4, houses.length))
+  })
+
+  it('stands each resident on its porch, outside the trunk end of the deck', () => {
+    for (const h of placeHouses(records(16), 80)) {
+      const spot = npcSpot(h)
+      expect(spot.y).toBe(h.at.y - 1)
+      expect(Math.sign(spot.x - h.at.x)).toBe(h.side)
+    }
+  })
+})
+
+describe('npcs', () => {
+  it('only shows frames that are on their sheets', () => {
+    for (const id of NPC_ORDER) {
+      for (let t = 0; t < 20; t += 0.25) {
+        const { row, frame } = npcFrame(id, t, 0.3, false)
+        expect(row).toBeLessThan(5)
+        expect(frame).toBeLessThan(12)
+      }
+      expect(npcFrame(id, 7, 0, true)).toEqual({ row: NPCS[id].idle.row, frame: NPCS[id].idle.frames[0] })
     }
   })
 })

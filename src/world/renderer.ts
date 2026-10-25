@@ -15,7 +15,7 @@ import {
   type View,
 } from './camera.ts'
 import { hitTest, type HitScene } from './hitTest.ts'
-import { houseBounds, placeHouses, type House } from './houses.ts'
+import { houseBounds, npcSpot, placeHouses, type House } from './houses.ts'
 import {
   RELIC_TILES,
   RUIN,
@@ -30,13 +30,14 @@ import {
   type TileRect,
 } from './layout.ts'
 import { computeLight, paintLight } from './lighting.ts'
+import { NPCS, npcFrame, type NpcId } from './npcs.ts'
 import { RELIC_SPRITES, drawOverlay, type OverlayState } from './overlay.ts'
 import { BACKDROP, LEAF, NATURAL_BARK } from './palette.ts'
 import type { Ambient, Rgb } from './particles.ts'
 import { mulberry32 } from './rng.ts'
 import { spiritFrame } from './spirit.ts'
 import { makeCanvas, spriteCanvas } from './sprites.ts'
-import { Stage, type Layers } from './stage.ts'
+import { Stage, type Layers, type StageFrame } from './stage.ts'
 import { drawTerrain } from './terrain.ts'
 import { clusterAt, drawTree } from './tree.ts'
 import { hexRgb, loadImage, loadTreeKit, woodIn, type TreeKit } from './treeKit.ts'
@@ -116,6 +117,7 @@ export class WorldRenderer {
   private readonly observer: ResizeObserver
   private kit: TreeKit | null = null
   private sheet: HTMLImageElement | null = null
+  private npcImages: Partial<Record<NpcId, HTMLImageElement>> = {}
 
   private scene: Scene = EMPTY_SCENE
   private segmentsKey = ''
@@ -167,12 +169,14 @@ export class WorldRenderer {
     this.stage = stage
     this.ctx2d = stage ? null : canvas.getContext('2d')
 
-    Promise.all([loadTreeKit(), loadImage(spiritSheetUrl)])
-      .then(([kit, sheet]) => {
+    Promise.all([loadTreeKit(), loadImage(spiritSheetUrl), loadNpcSheets()])
+      .then(([kit, sheet, npcs]) => {
         if (this.disposed) return
         this.kit = kit
         this.sheet = sheet
+        this.npcImages = npcs
         this.stage?.setSpiritSheet(sheet)
+        this.stage?.setNpcSheets(npcs)
         this.treeDirty = true
         this.overlayDirty = true
       })
@@ -310,6 +314,17 @@ export class WorldRenderer {
     const now = performance.now()
     const start = animate && !this.scene.reducedMotion ? now + GROW_MS : now - HOUSE_MS
     for (const h of this.houses) if (!this.houseStart.has(h.id)) this.houseStart.set(h.id, start)
+  }
+
+  /** Each finished house's resident on its porch, facing away from the trunk, mostly idle. */
+  private npcDraws(ms: number): StageFrame['npcs'] {
+    return this.houses
+      .filter((h) => this.houseProgress(h.id, ms) >= 1)
+      .map((h, i) => {
+        const { row, frame } = npcFrame(h.npc, ms / 1000, (i * 0.618) % 1, this.scene.reducedMotion)
+        const spot = npcSpot(h)
+        return { npc: h.npc, row, frame, x: spot.x, feetY: spot.y, flip: h.side < 0 }
+      })
   }
 
   private houseProgress(id: string, ms: number): number {
@@ -509,6 +524,7 @@ export class WorldRenderer {
       view: this.view,
       time,
       spirit,
+      npcs: this.npcDraws(ms),
       pulse,
       ruin: { strength: lit ? 1 : 0, at: ruinCentre(), since: this.ruinRevealedAt === null ? 1e3 : time - this.ruinRevealedAt },
       depth: Math.min(1, Math.max(0, pxToTile({ x: 0, y: this.cam.cy }).y / 24)),
@@ -532,6 +548,11 @@ export class WorldRenderer {
     ctx.drawImage(this.layers.tree, 0, 0)
     ctx.drawImage(this.layers.light, 0, 0, WORLD_COLS, WORLD_ROWS, 0, 0, WORLD_W, WORLD_H)
     ctx.drawImage(this.layers.overlay, 0, 0)
+    for (const a of this.npcDraws(ms)) {
+      const img = this.npcImages[a.npc]
+      const { w, h } = NPCS[a.npc].cell
+      if (img) drawCell(ctx, img, a.frame * w, a.row * h, w, h, Math.round(a.x - w / 2), a.feetY - h + 1, a.flip)
+    }
     if (!this.sheet || !this.scene.spiritEnabled) return
     const { anim, frame } = spiritFrame(ms / 1000, ms < this.happyUntil, this.scene.reducedMotion)
     const { w, h } = SPIRIT_CELL
@@ -663,6 +684,12 @@ export class WorldRenderer {
     this.tween = null
     this.cam = panBy(this.cam, this.view, -x * KEY_PAN, -y * KEY_PAN)
   }
+}
+
+async function loadNpcSheets(): Promise<Record<NpcId, HTMLImageElement>> {
+  const ids = Object.keys(NPCS) as NpcId[]
+  const images = await Promise.all(ids.map((id) => loadImage(NPCS[id].url)))
+  return Object.fromEntries(ids.map((id, i) => [id, images[i]])) as Record<NpcId, HTMLImageElement>
 }
 
 /** Content, not identity: callers may rebuild the array on every render. */
