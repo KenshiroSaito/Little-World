@@ -75,3 +75,25 @@ python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt
 
 Status frames that would make the spirit look worse (the sheet's Sad/Wilt) are
 left out on purpose: the spirit never reacts badly to a hard day.
+
+## Trinkets and accessories
+
+`split_sheets.py` cuts `sheets/trinkets.png` and `sheets/accessories.png` into
+one transparent PNG per sprite, in `src/world/assets/trinkets/<group>/` and
+`src/world/assets/accessories/<category>/`. These sheets are painted at no
+steady pixel scale, so sprites keep the sheet's own resolution (no grid
+snapping); snap them when they go into the game at world scale.
+
+```sh
+.venv/bin/python tools/split_sheets.py                    # write every sprite
+.venv/bin/python tools/split_sheets.py --preview /tmp/art # plus labelled contact sheets
+```
+
+- Trinkets are keyed off the flat background, row by row; the names for each
+  row are listed in the script, left to right.
+- Each accessory comes as several views: `<name>.png` is the top (front) view,
+  `<name>-2.png`, `<name>-3.png`, ... the smaller views in reading order. The
+  sheet's alpha matte is uneven, so each cell picks the alpha level that tells
+  its views apart best, and each view is grown back out to its own dark outline.
+  Where the matte kept background as solid as the art, that colour is listed
+  under `backgrounds` in the script.

@@ -61,11 +61,30 @@ TRINKETS = {
 ACCESSORIES = {
     'source': 'sheets/accessories.png',
     'out': 'accessories',
-    # Alpha at or above `core` is art; the outline around it is grown back where alpha is at least `edge`.
-    # Around dark accessories the matte keeps some background at 200 to 225, so the core starts above that.
-    'core': 225,
-    'edge': 120,
-    'grow': 3,
+    # Alpha at or above a core level is art, and its outline is grown back over pixels at least `fringe`
+    # below that level (never below `edge`). The matte is uneven: faint small jewels need a low core, and
+    # around dark accessories it keeps background up to about 240. So each cell tries every level in
+    # `cores` and keeps the one that tells its views apart best (see cell_views).
+    'cores': [180, 200, 215, 225, 235, 240, 245],
+    'edge': 100,
+    'fringe': 80,
+    'grow': 2,
+    # Each view is then grown from its core out to its own dark outline (max channel below `outline`),
+    # at most `reach` pixels, so a high core level does not shave the sprite.
+    'outline': 30,
+    'reach': 12,
+    # Colours this close to a cell's kept background (see patch_colour) are background.
+    'patch_tolerance': 14,
+    # Cells whose kept background is as solid as the art: that colour, cut out of the core too.
+    'backgrounds': {
+        'jewelry/heart-necklace': ([42, 56, 56], 14),
+        'wings/bat-wings': ([28, 36, 44], 10),
+        'neckwear/black-scarf': ([36, 36, 52], 8),
+    },
+    # Views smaller than this (image pixels) are fragments of a view, not views.
+    'min_view': 80,
+    # In these categories the top row is one view (a pair of glasses, a pair of earrings).
+    'one_view_on_top': ['hats', 'eyewear', 'neckwear', 'backs', 'jewelry'],
     # Ten columns between these x positions.
     'span': [1, 1313],
     # Each category's band of rows (below its label), and its ten accessories left to right.
@@ -117,16 +136,34 @@ def components(mask):
     return out
 
 
-def grow(mask, n):
+def neighbours(mask):
     out = mask.copy()
-    for _ in range(n):
-        m = out.copy()
-        m[1:] |= out[:-1]
-        m[:-1] |= out[1:]
-        m[:, 1:] |= out[:, :-1]
-        m[:, :-1] |= out[:, 1:]
-        out = m
+    out[1:] |= mask[:-1]
+    out[:-1] |= mask[1:]
+    out[:, 1:] |= mask[:, :-1]
+    out[:, :-1] |= mask[:, 1:]
     return out
+
+
+def grow(mask, n):
+    out = mask
+    for _ in range(n):
+        out = neighbours(out)
+    return out
+
+
+def grow_to_outline(seed, allowed, outline, steps):
+    """`seed` grown over `allowed` pixels for up to `steps` pixels; outline pixels are taken
+    but never grown past, so a sprite stops at its own outline."""
+    mask = seed.copy()
+    front = seed & ~outline
+    for _ in range(steps):
+        new = neighbours(front) & allowed & ~mask
+        if not new.any():
+            break
+        mask |= new
+        front = new & ~outline
+    return mask
 
 
 def clean(mask):
@@ -190,8 +227,9 @@ def split_trinkets(spec):
     return sprites
 
 
-def views(mask, join):
-    """The separate pictures in one cell: pieces joined when nearly touching, in reading order."""
+def view_rows(mask, join):
+    """The separate pictures in one cell, as rows of [y0, x0, y1, x1] boxes: pieces joined
+    when nearly touching, rows top to bottom, boxes left to right."""
     boxes = [[ys.min(), xs.min(), ys.max() + 1, xs.max() + 1] for ys, xs in components(mask) if len(ys) >= SPECK * 4]
     merged = True
     while merged:
@@ -214,7 +252,46 @@ def views(mask, join):
             rows[-1].append(b)
         else:
             rows.append([b])
-    return [b for row in rows for b in sorted(row, key=lambda b: b[1])]
+    return [sorted(row, key=lambda b: b[1]) for row in rows]
+
+
+def cell_views(a, spec, one_on_top):
+    """The mask and view boxes for one accessory cell, at the core level that finds the most
+    views. A level is no good if it breaks a view into fragments or finds more than two views
+    side by side (every row holds one or two); ties go to the lower level, which keeps more
+    of each sprite."""
+    best = None
+    for level in spec['cores']:
+        mask = clean(grow(clean(a >= level), spec['grow']) & (a >= max(spec['edge'], level - spec['fringe'])))
+        rows = view_rows(mask, spec['join'])
+        if not rows:
+            continue
+        if one_on_top:
+            top = rows[0]
+            rows[0] = [[min(b[0] for b in top), min(b[1] for b in top), max(b[2] for b in top), max(b[3] for b in top)]]
+        boxes = [b for row in rows for b in row]
+        areas = [mask[b[0]:b[2], b[1]:b[3]].sum() for b in boxes]
+        if any(len(row) > 2 for row in rows) or min(areas) < spec['min_view']:
+            continue
+        if best is None or len(boxes) > len(best[1]):
+            best = (level, boxes)
+    if best is None:
+        raise SystemExit('accessories: no core level separates this cell cleanly')
+    return best
+
+
+def patch_colour(colours, candidates):
+    """The flat background the matte kept round a dark sprite, if there is much of it: the most
+    common colour (in steps of 8) among `candidates`, when it is at least a quarter of them."""
+    px = colours[candidates]
+    if len(px) < 150:
+        return None
+    steps = px // 8
+    keys, counts = np.unique(steps, axis=0, return_counts=True)
+    top = counts.argmax()
+    if counts[top] < len(px) / 4:
+        return None
+    return px[(steps == keys[top]).all(axis=1)].mean(axis=0)
 
 
 def split_accessories(spec):
@@ -226,15 +303,27 @@ def split_accessories(spec):
     for folder, (y0, y1), names in spec['categories']:
         for c, name in enumerate(names):
             x0, x1 = edges[c], edges[c + 1]
-            a = alpha[y0:y1, x0:x1]
-            core = clean(a >= spec['core'])
-            mask = clean(grow(core, spec['grow']) & (a >= spec['edge']))
-            found = views(mask, spec['join'])
-            if not found:
-                raise SystemExit(f'accessories: nothing found for {folder}/{name}')
+            a, colours = alpha[y0:y1, x0:x1], rgb[y0:y1, x0:x1]
+            level, found = cell_views(a, spec, folder in spec['one_view_on_top'])
+            core = clean(a >= level)
+            allowed = a >= spec['edge']
+            outline = allowed & (colours.max(axis=2) < spec['outline'])
+            # Outlines have gaps; never grow into the cell's kept background through them.
+            patch = patch_colour(colours, allowed & ~grow(core, 1) & ~outline)
+            if patch is not None:
+                allowed &= np.abs(colours - patch).max(axis=2) > spec['patch_tolerance']
+            if f'{folder}/{name}' in spec['backgrounds']:
+                colour, tolerance = spec['backgrounds'][f'{folder}/{name}']
+                art = np.abs(colours - np.array(colour)).max(axis=2) > tolerance
+                allowed &= art
+                core = clean(core & art)
+            reach = spec['reach']
             for i, (vy0, vx0, vy1, vx1) in enumerate(found):
-                piece = np.zeros_like(mask)
-                piece[vy0:vy1, vx0:vx1] = mask[vy0:vy1, vx0:vx1]
+                seed = np.zeros_like(core)
+                seed[vy0:vy1, vx0:vx1] = core[vy0:vy1, vx0:vx1]
+                room = np.zeros_like(core)
+                room[max(0, vy0 - reach):vy1 + reach, max(0, vx0 - reach):vx1 + reach] = True
+                piece = clean(grow_to_outline(seed, allowed & room, outline, reach))
                 suffix = '' if i == 0 else f'-{i + 1}'
                 sprites.append((f'{folder}/{name}{suffix}', cutout(rgb[y0:y1, x0:x1], piece)))
     return sprites
