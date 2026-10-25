@@ -80,7 +80,10 @@ export function panBy(cam: Camera, view: View, dx: number, dy: number, world = W
   return clampCamera({ zoom: cam.zoom, cx: cam.cx - dx / s, cy: cam.cy - dy / s }, view, world)
 }
 
-/** The largest whole zoom up to `maxZoom` that shows all of `rect`, centred on it. */
+/**
+ * The largest whole zoom up to `maxZoom` that shows all of `rect`, centred on it.
+ * If it is too tall even at the smallest zoom, its top stays in view (the canopy, not mid-root).
+ */
 export function fitRect(rect: PxRect, view: View, maxZoom = MAX_ZOOM, world = WORLD_RECT): Camera {
   let zoom = MIN_ZOOM
   for (let z = clampZoom(maxZoom); z > MIN_ZOOM; z--) {
@@ -90,7 +93,9 @@ export function fitRect(rect: PxRect, view: View, maxZoom = MAX_ZOOM, world = WO
       break
     }
   }
-  return clampCamera({ zoom, cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2 }, view, world)
+  const visible = view.height / cssScale(zoom, view.dpr)
+  const cy = rect.h > visible ? rect.y + visible / 2 : rect.y + rect.h / 2
+  return clampCamera({ zoom, cx: rect.x + rect.w / 2, cy }, view, world)
 }
 
 /** Position eases; zoom switches to the target at once so every frame stays crisp. */

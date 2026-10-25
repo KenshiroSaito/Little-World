@@ -60,7 +60,8 @@ void main() {
 
 /**
  * Pixel particles, animated entirely on the GPU from their spawn data:
- * kind 0 fireflies wander, kind 1 bursts fly out and fade, kind 2 motes rise.
+ * kind 0 fireflies wander, kind 1 bursts fly out and fade, kind 2 motes rise,
+ * kind 3 leaves sway down to the ground, tumbling, then wait unseen to fall again.
  */
 export const PARTICLE_VERT = /* glsl */ `
 uniform float uTime;
@@ -76,11 +77,15 @@ attribute float aKind;
 attribute float aSize;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vLeaf;
+varying float vFlip;
 void main() {
   float t = uTime * uMotion;
   float age = uTime - aBirth;
   vec2 p = aOrigin;
   float alpha = 1.0;
+  vLeaf = 0.0;
+  vFlip = 0.0;
   if (aKind < 0.5) {
     p += vec2(sin(t * 0.7 + aSeed * 6.28) * 10.0 + sin(t * 1.3 + aSeed * 17.0) * 4.0,
               cos(t * 0.5 + aSeed * 9.0) * 7.0);
@@ -89,10 +94,18 @@ void main() {
     float k = clamp(age / aLife, 0.0, 1.0);
     p += aVelocity * age * (1.0 - 0.45 * k) + vec2(0.0, 26.0 * age * age);
     alpha = (age < 0.0 || age > aLife) ? 0.0 : 1.0 - k * k;
-  } else {
+  } else if (aKind < 2.5) {
     float cycle = fract(t * 0.08 + aSeed);
     p += vec2(sin(t + aSeed * 30.0) * 3.0, -cycle * aVelocity.y);
     alpha = sin(cycle * 3.14159);
+  } else {
+    float cycle = fract(t * aVelocity.x + aSeed);
+    float k = min(1.0, cycle * 2.0);
+    float phase = t * 1.8 + aSeed * 20.0;
+    p += vec2(sin(phase) * 6.0 + (aSeed - 0.5) * 24.0 * k, k * aVelocity.y);
+    alpha = cycle < 0.5 ? smoothstep(0.0, 0.08, k) * (1.0 - smoothstep(0.85, 1.0, k)) * uMotion : 0.0;
+    vLeaf = 1.0;
+    vFlip = cos(phase);
   }
   vColor = aColor;
   vAlpha = alpha;
@@ -105,9 +118,20 @@ export const PARTICLE_FRAG = /* glsl */ `
 uniform float uBoost;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vLeaf;
+varying float vFlip;
 void main() {
   if (vAlpha <= 0.01) discard;
-  gl_FragColor = vec4(vColor * vAlpha * uBoost, vAlpha);
+  vec3 col = vColor;
+  if (vLeaf > 0.5) {
+    // A 3x3 pixel leaf on the diagonal, mirrored as it sways, dark on its lower edge.
+    vec2 c = floor(gl_PointCoord * 3.0);
+    if (vFlip > 0.0) c.x = 2.0 - c.x;
+    float d = c.x + c.y;
+    if (d < 0.5 || d > 3.5) discard;
+    if (d > 2.5) col *= 0.7;
+  }
+  gl_FragColor = vec4(col * vAlpha * uBoost, vAlpha);
 }
 `
 

@@ -5,17 +5,24 @@ import { PARTICLE_FRAG, PARTICLE_VERT } from './shaders.ts'
 
 export type Rgb = [number, number, number]
 
-/** A long-lived particle: kind 0 wanders around its origin, kind 2 rises and loops. */
-export type Ambient = { origin: Point; color: Rgb; kind: 0 | 2; rise?: number; size?: number }
+/**
+ * A long-lived particle: kind 0 wanders around its origin, kind 2 rises `rise`
+ * pixels and loops, kind 3 is a leaf that tumbles `fall` pixels down and loops.
+ */
+export type Ambient = { origin: Point; color: Rgb; kind: 0 | 2 | 3; rise?: number; fall?: number; size?: number }
 
 const AMBIENT_MAX = 320
 const BURST_MAX = 400
 const DEAD_BIRTH = -1e6
+/** World pixels a leaf falls per second; between falls it rests unseen for as long again. */
+const LEAF_SPEED = 18
+const MIN_FALL = 16
 
 /**
  * Pixel particles in one buffer: ambient slots first, then a ring of burst
  * slots. Spawning writes a few attributes; every frame after that is GPU-only.
  * The same geometry is drawn crisp in the scene and brighter in the bloom pass.
+ * Additive by default, for light; with `additive` false the pixels are solid (leaves).
  */
 export class Particles {
   readonly main: THREE.Points
@@ -30,7 +37,7 @@ export class Particles {
   private readonly rand = mulberry32(99)
   private next = 0
 
-  constructor() {
+  constructor(additive = true) {
     const n = AMBIENT_MAX + BURST_MAX
     const make = (size: number) => new THREE.BufferAttribute(new Float32Array(n * size), size)
     this.attr = {
@@ -55,7 +62,8 @@ export class Particles {
         transparent: true,
         depthTest: false,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+        premultipliedAlpha: !additive,
       })
     this.main = new THREE.Points(this.geometry, material(1))
     this.glow = new THREE.Points(this.geometry, material(1.8))
@@ -69,7 +77,10 @@ export class Particles {
         this.kill(i)
         continue
       }
-      this.write(i, a.origin, [0, a.rise ?? 0], a.color, 0, 1, this.rand(), a.kind, a.size ?? 1)
+      // Leaves: velocity is (falls per second, fall height), so each takes about as long whatever its height.
+      const fall = Math.max(MIN_FALL, a.fall ?? 0)
+      const velocity = a.kind === 3 ? [(LEAF_SPEED / (2 * fall)) * (0.7 + 0.6 * this.rand()), fall] : [0, a.rise ?? 0]
+      this.write(i, a.origin, velocity, a.color, 0, 1, this.rand(), a.kind, a.size ?? 1)
     }
     this.flush()
   }

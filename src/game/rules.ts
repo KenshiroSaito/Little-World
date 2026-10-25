@@ -20,9 +20,9 @@ export function doneToday(state: GameState, now: string): ActivityId[] {
 }
 
 /**
- * Record one activity. Returns the same state object, unchanged, when that
- * activity was already recorded today, so each activity pays out once a day.
- * `now` is passed in (ISO string) so this stays a pure function.
+ * Record one activity. There is no daily limit: every record pays out, however
+ * often the activity was done today. `now` is passed in (ISO string) so this
+ * stays a pure function.
  */
 export function recordActivity(
   state: GameState,
@@ -31,11 +31,11 @@ export function recordActivity(
   extras: { text?: string; mood?: MoodTag } = {},
 ): GameState {
   const date = localDate(new Date(now), state.dayOffset);
-  if (state.selfCareLogs.some(log => log.date === date && log.activityId === activityId)) return state;
+  const earlier = state.selfCareLogs.filter(log => log.date === date && log.activityId === activityId).length;
 
   const log: SelfCareLog = {
-    // One record per activity per day, so date + activity is already unique.
-    id: `${date}-${activityId}`,
+    // date + activity, numbered from the second time that day: unique, and the ids older saves already use.
+    id: earlier === 0 ? `${date}-${activityId}` : `${date}-${activityId}-${earlier + 1}`,
     activityId,
     date,
     createdAt: now,

@@ -19,6 +19,7 @@ import { houseBounds, placeHouses, type House } from './houses.ts'
 import {
   RELIC_TILES,
   RUIN,
+  SURFACE_Y,
   WORLD_COLS,
   WORLD_H,
   WORLD_ROWS,
@@ -39,7 +40,15 @@ import { Stage, type Layers } from './stage.ts'
 import { drawTerrain } from './terrain.ts'
 import { clusterAt, drawTree } from './tree.ts'
 import { hexRgb, loadImage, loadTreeKit, woodIn, type TreeKit } from './treeKit.ts'
-import { analyzeTree, boundsToPx, growSegments, segmentBounds, spiritPerch, type TreeShape } from './treeShape.ts'
+import {
+  GROWN_LP,
+  analyzeTree,
+  boundsToPx,
+  growSegments,
+  segmentBounds,
+  spiritPerch,
+  type TreeShape,
+} from './treeShape.ts'
 
 export type Scene = {
   segments: readonly Segment[]
@@ -308,11 +317,25 @@ export class WorldRenderer {
     return start === undefined ? 1 : Math.min(1, Math.max(0, (ms - start) / HOUSE_MS))
   }
 
-  /** Fireflies in each branch's leaf colour, amber spores on roots, gold motes in a lit ruin. */
+  /**
+   * Fireflies in each branch's leaf colour, amber spores on roots, gold motes in
+   * a lit ruin, and leaves falling from every branch (two each once the tree is grown).
+   */
   private rebuildAmbient() {
     if (!this.stage) return
     const rand = mulberry32(7)
     const jitter = (p: Point, r: number) => ({ x: p.x + (rand() - 0.5) * r, y: p.y + (rand() - 0.5) * r })
+    const ground = tileToPx({ x: 0, y: SURFACE_Y }).y
+    const leaves: Ambient[] = []
+    for (const s of this.scene.segments) {
+      if (s.kind !== 'branch') continue
+      const shades = LEAF[s.leafColor ?? 'base']
+      for (let i = this.scene.lp >= GROWN_LP ? 2 : 1; i > 0; i--) {
+        const origin = jitter(tileToPx(s.to), 20)
+        leaves.push({ origin, color: rgb01(rand() < 0.5 ? shades.mid : shades.dark), kind: 3, fall: ground - origin.y, size: 3 })
+      }
+    }
+    this.stage.leaves.setAmbient(leaves)
     const list: Ambient[] = [{ origin: jitter(tileToPx({ x: 0, y: -3 }), 20), color: rgb01(LEAF.base.light), kind: 0 }]
     for (const s of this.scene.segments) {
       const p = tileToPx(s.to)

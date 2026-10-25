@@ -3,6 +3,7 @@ import TitleScreen from "./components/TitleScreen";
 import Hud from "./components/Hud";
 import SelfCarePanel from "./components/SelfCarePanel";
 import PaintPalette from "./components/PaintPalette";
+import JournalBook from "./components/JournalBook";
 import RelicsPanel from "./components/RelicsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import SpiritBubble from "./components/SpiritBubble";
@@ -13,7 +14,7 @@ import type { CanvasSelection, ColorId } from "./types";
 import "./App.css";
 
 type Screen = "title" | "tree";
-export type PanelId = "selfCare" | "relics" | "settings";
+export type PanelId = "selfCare" | "journal" | "relics" | "settings";
 
 /** One paint action, remembered so Undo can put the previous colour back. */
 type PaintStep = { segmentId: string; previous: ColorId | null };
@@ -106,6 +107,7 @@ export default function App() {
       )}
 
       {openPanel === "selfCare" && <SelfCarePanel onClose={closePanel} />}
+      {openPanel === "journal" && <JournalBook onClose={closePanel} />}
       {openPanel === "relics" && <RelicsPanel onClose={closePanel} />}
       {openPanel === "settings" && <SettingsPanel onClose={closePanel} />}
 

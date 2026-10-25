@@ -53,6 +53,8 @@ const SPIRIT_LIGHT_TILES = 4.5
  */
 export class Stage {
   readonly particles = new Particles()
+  /** Falling leaves: solid pixels in the scene only, so they never glow. */
+  readonly leaves = new Particles(false)
   private readonly renderer: THREE.WebGLRenderer
   private readonly camera = new THREE.OrthographicCamera(0, 1, 0, -1, -10, 10)
   private readonly main = new THREE.Scene()
@@ -109,6 +111,8 @@ export class Stage {
       worldPlane(this.darkness, 2),
       worldPlane(flat('overlay'), 3),
     )
+    this.leaves.main.renderOrder = 4
+    this.main.add(this.leaves.main)
     this.particles.main.renderOrder = 4
     this.main.add(this.particles.main)
     this.glowScene.add(worldPlane(flat('glow'), 0))
@@ -192,6 +196,7 @@ export class Stage {
     this.camera.updateProjectionMatrix()
 
     this.particles.update(f.time, k, f.motion)
+    this.leaves.update(f.time, k, f.motion)
     this.updateSpirit(f)
 
     const u = this.composite.uniforms
@@ -221,6 +226,7 @@ export class Stage {
     this.bloomComposer.dispose()
     this.finalComposer.dispose()
     this.particles.dispose()
+    this.leaves.dispose()
     for (const t of Object.values(this.textures)) t.dispose()
     this.sheet?.dispose()
     this.main.traverse(disposeMesh)

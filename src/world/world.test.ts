@@ -63,12 +63,19 @@ describe('camera', () => {
     expect(cam.zoom).toBe(4)
     expect(cam.cx).toBe(195)
   })
+
+  it('keeps the top of a rectangle too tall to fit in view', () => {
+    const rect = { x: 300, y: 100, w: 200, h: 900 }
+    const cam = fitRect(rect, view)
+    expect(cam.zoom).toBe(MIN_ZOOM)
+    expect(screenToWorld(cam, view, { x: 0, y: 0 }).y).toBeLessThanOrEqual(rect.y)
+  })
 })
 
 describe('tree shape', () => {
   it('gives each segment a leaf size that never changes', () => {
-    for (const s of FIXTURE_SEGMENTS) expect(leafSize(s.id, 40)).toBe(leafSize(s.id, 40))
-    expect(new Set(FIXTURE_SEGMENTS.map((s) => leafSize(s.id, 40))).size).toBeGreaterThan(1)
+    for (const s of FIXTURE_SEGMENTS) expect(leafSize(s.id, 20)).toBe(leafSize(s.id, 20))
+    expect(new Set(FIXTURE_SEGMENTS.map((s) => leafSize(s.id, 20))).size).toBeGreaterThan(1)
   })
 
   it('grows leaf clusters with LP, never shrinking them', () => {

@@ -4,6 +4,7 @@ import { gameReducer, initialGameState } from '../state/gameReducer';
 import { isValidGameState } from '../state/persistence';
 import { buildTree, rootDepth } from './buildTree';
 import { doneToday, localDate, recordActivity } from './rules';
+import { journalPages } from './journal';
 import { inscriptions, revealedRelics, totalLP, unlockedColors } from './progression';
 import { allSpiritTemplates, spiritMessage } from './spirit';
 
@@ -19,17 +20,19 @@ function fullDays(days: number, state: GameState = initialGameState): GameState 
 }
 
 describe('rewards', () => {
-  it('awards each activity once per day', () => {
+  it('pays out every record of an activity, even on the same day', () => {
     const once = recordActivity(initialGameState, 'walk', at(1, 9));
     const twice = recordActivity(once, 'walk', at(1, 18));
-    expect(twice).toBe(once);
-    expect(totalLP(twice)).toBe(5);
+    expect(totalLP(twice)).toBe(10);
+    expect(twice.selfCareLogs.map(l => l.id)).toEqual(['2026-10-01-walk', '2026-10-01-walk-2']);
   });
 
-  it('caps a day at 20 LP', () => {
-    const day = fullDays(1);
-    expect(totalLP(day)).toBe(20);
-    for (const a of ALL) expect(recordActivity(day, a, at(1, 20))).toBe(day);
+  it('has no daily LP cap', () => {
+    let day = fullDays(1);
+    for (const a of ALL) day = recordActivity(day, a, at(1, 20));
+    expect(totalLP(day)).toBe(40);
+    expect(doneToday(day, at(1))).toHaveLength(8);
+    expect(isValidGameState(day)).toBe(true);
   });
 
   it('pays out again the next day', () => {
@@ -159,5 +162,23 @@ describe('saving', () => {
     expect(isValidGameState(null)).toBe(false);
     expect(isValidGameState({ version: 3 })).toBe(false);
     expect(isValidGameState({ ...initialGameState, selfCareLogs: [{ id: 'x' }] })).toBe(false);
+  });
+});
+
+describe('journal', () => {
+  it('starts a page for each day, oldest first, and opens nothing for no records', () => {
+    expect(journalPages([])).toEqual([]);
+    const pages = journalPages(fullDays(3).selfCareLogs);
+    expect(pages.map(p => p.date)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
+    expect(pages.every(p => !p.continued && p.entries.length === 4)).toBe(true);
+  });
+
+  it('carries a busy day over onto more pages, keeping every record once', () => {
+    let state = initialGameState;
+    for (let i = 0; i < 30; i++) state = recordActivity(state, ALL[i % 4], at(1, 8), { text: 'x'.repeat(100) });
+    const pages = journalPages(state.selfCareLogs);
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.slice(1).every(p => p.continued && p.date === '2026-10-01')).toBe(true);
+    expect(pages.flatMap(p => p.entries.map(e => e.id))).toEqual(state.selfCareLogs.map(l => l.id));
   });
 });

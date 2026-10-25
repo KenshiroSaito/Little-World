@@ -159,3 +159,147 @@
   align-self: flex-start;
   padding: 2px 8px;
 }
+
+/* Journal: a Minecraft-style book over a dimmed world. */
+.book-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(16, 12, 8, 0.6);
+}
+
+.book {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  font-family: "VT323", "Courier New", monospace;
+}
+
+.book-cover {
+  padding: 0 10px 10px 0;
+  background: #7b4b25;
+  box-shadow:
+    0 0 0 4px #2e1a0b,
+    12px 12px 0 4px rgba(0, 0, 0, 0.35);
+}
+
+.book-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 48px));
+  height: min(480px, calc(100vh - 140px));
+  padding: 30px 30px 58px;
+  background: #fbf3dc;
+  color: #2b1d0e;
+  font-size: 22px;
+  line-height: 1.05;
+  box-shadow:
+    inset 0 0 0 3px #efe1bb,
+    inset -6px -6px 0 3px #e6d3a3,
+    0 0 0 4px #2e1a0b;
+}
+
+.book-page-number {
+  margin: 0 0 10px;
+  align-self: flex-end;
+  font-size: 19px;
+  color: #6b5236;
+}
+
+.book-date {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: normal;
+  color: #4a2c12;
+}
+
+.book-entries {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.book-entries li {
+  margin-bottom: 10px;
+}
+
+.book-leaf {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  box-shadow: 0 0 0 2px #2b1d0e;
+}
+
+.book-time {
+  color: #7a6248;
+}
+
+.book-text,
+.book-mood {
+  margin: 2px 0 0 20px;
+}
+
+.book-mood {
+  color: #6b4f8a;
+}
+
+.book-empty {
+  color: #6b5236;
+}
+
+.book-arrow {
+  position: absolute;
+  bottom: 16px;
+  padding: 4px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: #8a3b1c;
+  line-height: 0;
+}
+
+.book-arrow:hover {
+  color: #d0602c;
+}
+
+.book-arrow:disabled {
+  visibility: hidden;
+}
+
+.book-arrow-back {
+  left: 22px;
+}
+
+.book-arrow-next {
+  right: 22px;
+}
+
+.book-done {
+  width: 220px;
+  padding: 6px 0 8px;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #727272;
+  color: #fff;
+  font-family: inherit;
+  font-size: 24px;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  box-shadow:
+    inset 2px 2px 0 #a9a9a9,
+    inset -2px -4px 0 #555;
+}
+
+.book-done:hover {
+  background: #7d86b8;
+  box-shadow:
+    inset 2px 2px 0 #b7bfe9,
+    inset -2px -4px 0 #4f5785;
+}

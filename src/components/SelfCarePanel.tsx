@@ -25,15 +25,12 @@ export default function SelfCarePanel({ onClose }: Props) {
       <h2>Self-Care</h2>
       <ul className="activity-list">
         {ACTIVITIES.map((a) => {
-          const done = doneToday.includes(a.id);
+          const times = doneToday.filter((id) => id === a.id).length;
           return (
             <li key={a.id}>
-              <button
-                disabled={done}
-                onClick={() => (a.id === "reflect" ? setReflectOpen(true) : recordAndClose(a.id))}
-              >
+              <button onClick={() => (a.id === "reflect" ? setReflectOpen(true) : recordAndClose(a.id))}>
                 {a.label} · 5 LP · {a.colorName}
-                {done && " ✓ done today"}
+                {times > 0 && ` ✓ done today${times > 1 ? ` ×${times}` : ""}`}
               </button>
             </li>
           );
