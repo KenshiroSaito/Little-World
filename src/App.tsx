@@ -10,6 +10,7 @@ import RelicsPanel from "./components/RelicsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import SpiritBubble from "./components/SpiritBubble";
 import DemoControls from "./components/DemoControls";
+import GrowBoost from "./components/GrowBoost";
 import TreeCanvas, { type TreeCanvasHandle } from "./world/TreeCanvas";
 import { useGame } from "./state/GameProvider";
 import type { CanvasSelection, LeafColor } from "./types";
@@ -141,6 +142,7 @@ export default function App() {
         <SpiritBubble message={game.spiritMessage} onClose={game.markSpiritShown} />
       )}
 
+      <GrowBoost />
       {DEMO_MODE && <DemoControls />}
     </div>
   );
