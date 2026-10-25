@@ -15,7 +15,8 @@ import { FIXTURE_SEGMENTS } from './fixtures.ts'
 import { hitTest } from './hitTest.ts'
 import { RELIC_TILES, RUIN, STONE_TOP, TABLET, WORLD, WORLD_COLS, WORLD_H, WORLD_W } from './layout.ts'
 import { computeLight } from './lighting.ts'
-import { analyzeTree, growSegments, leafSize, segmentBounds } from './treeShape.ts'
+import { houseCount, placeHouses } from './houses.ts'
+import { GROWN_LP, analyzeTree, growSegments, leafSize, segmentBounds, treeGrowth } from './treeShape.ts'
 import { resizedColumns, solidColumns } from './treeKit.ts'
 
 const view: View = { width: 800, height: 600, dpr: 1 }
@@ -66,13 +67,28 @@ describe('camera', () => {
 
 describe('tree shape', () => {
   it('gives each segment a leaf size that never changes', () => {
-    for (const s of FIXTURE_SEGMENTS) expect(leafSize(s.id)).toBe(leafSize(s.id))
-    expect(new Set(FIXTURE_SEGMENTS.map((s) => leafSize(s.id))).size).toBeGreaterThan(1)
+    for (const s of FIXTURE_SEGMENTS) expect(leafSize(s.id, 40)).toBe(leafSize(s.id, 40))
+    expect(new Set(FIXTURE_SEGMENTS.map((s) => leafSize(s.id, 40))).size).toBeGreaterThan(1)
+  })
+
+  it('grows leaf clusters with LP, never shrinking them', () => {
+    for (const s of FIXTURE_SEGMENTS) {
+      const sizes = [0, 20, 40, 80].map((lp) => leafSize(s.id, lp))
+      expect([...sizes].sort((a, b) => a - b)).toEqual(sizes)
+    }
+    expect(Math.max(...FIXTURE_SEGMENTS.map((s) => leafSize(s.id, 80)))).toBe(4)
+  })
+
+  it('thickens the trunk with LP and jumps once the tree is grown', () => {
+    expect(treeGrowth(GROWN_LP).trunkWidth).toBeGreaterThan(treeGrowth(GROWN_LP - 5).trunkWidth + 1)
+    expect(treeGrowth(GROWN_LP).grown).toBe(true)
+    expect(treeGrowth(GROWN_LP - 5).grown).toBe(false)
+    expect(treeGrowth(1e6).trunkWidth).toBe(treeGrowth(1e7).trunkWidth)
   })
 
   it('thickens older segments as the tree grows', () => {
-    const early = analyzeTree(records(2))
-    const late = analyzeTree(records(16))
+    const early = analyzeTree(records(2), 10)
+    const late = analyzeTree(records(16), 80)
     expect(late.widths.get('log-01:b')!).toBeGreaterThan(early.widths.get('log-01:b')!)
     expect(late.trunkWidth).toBeGreaterThan(early.trunkWidth)
   })
@@ -80,7 +96,7 @@ describe('tree shape', () => {
   it('survives a parent cycle in bad data', () => {
     const a = { ...FIXTURE_SEGMENTS[0], id: 'a', parentId: 'b' }
     const b = { ...FIXTURE_SEGMENTS[0], id: 'b', parentId: 'a' }
-    expect(() => analyzeTree([a, b])).not.toThrow()
+    expect(() => analyzeTree([a, b], 10)).not.toThrow()
   })
 
   it('grows new segments from their base', () => {
@@ -89,9 +105,36 @@ describe('tree shape', () => {
   })
 
   it('bounds include the sapling and the deepest root', () => {
-    const r = segmentBounds(records(8), true)
+    const r = segmentBounds(records(8), true, 40)
     expect(r.top).toBeLessThan(-3)
     expect(r.bottom).toBe(RUIN.top)
+  })
+})
+
+describe('tree houses', () => {
+  it('builds the first house at 40 LP and one more every record after', () => {
+    expect(houseCount(GROWN_LP - 5)).toBe(0)
+    expect(houseCount(GROWN_LP)).toBe(1)
+    expect(houseCount(GROWN_LP + 5)).toBe(2)
+    expect(placeHouses(records(7), 35)).toEqual([])
+    expect(placeHouses(records(8), 40)).toHaveLength(1)
+  })
+
+  it('never moves a house as the tree grows', () => {
+    const before = placeHouses(records(12), 60)
+    const after = placeHouses(records(16), 80)
+    expect(before.length).toBeGreaterThan(1)
+    expect(after.slice(0, before.length)).toEqual(before)
+  })
+
+  it('keeps houses apart, one per branch', () => {
+    const houses = placeHouses(records(16), 80)
+    expect(new Set(houses.map((h) => h.segmentId)).size).toBe(houses.length)
+    for (const a of houses) {
+      for (const b of houses) {
+        if (a !== b) expect(Math.abs(a.at.x - b.at.x) >= 52 || Math.abs(a.at.y - b.at.y) >= 44).toBe(true)
+      }
+    }
   })
 })
 
@@ -106,7 +149,7 @@ describe('fixture thresholds', () => {
 })
 
 describe('hit testing', () => {
-  const scene = { segments: records(16), revealedRelics: [], ruinLit: false }
+  const scene = { segments: records(16), revealedRelics: [], ruinLit: false, lp: 80 }
 
   it('finds the branch whose leaves were clicked', () => {
     expect(hitTest(scene, { x: -4, y: -9 })).toEqual({ kind: 'segment', id: 'log-02:b' })

@@ -75,6 +75,7 @@ export default function App() {
         segments={game.segments}
         revealedRelics={game.revealedRelics.map((relic) => relic.id)}
         inscriptionCount={game.inscriptions.length}
+        lp={game.totalLP}
         paintMode={paintMode}
         reducedMotion={state.settings.reducedMotion}
         spiritEnabled={state.spirit.enabled}

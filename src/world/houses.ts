@@ -5,6 +5,7 @@
 import type { Segment } from '../types.ts'
 import { WORLD, pxToTile, tileToPx, type Point, type TileRect } from './layout.ts'
 import { hashString } from './rng.ts'
+import { makeCanvas, withOutline } from './sprites.ts'
 import { hexRgb } from './treeKit.ts'
 import { GROWN_LP } from './treeShape.ts'
 
@@ -218,5 +219,55 @@ export function drawHouse(ctx: CanvasRenderingContext2D, h: House, wood: string,
   const chimney = h.side > 0 ? hutX + 5 : hutX + HUT_W - 9
   rect(chimney - 1, wallTop - ROOF_H + 1, 6, 8, OUTLINE)
   rect(chimney, wallTop - ROOF_H + 2, 4, 7, look.trim)
+  ctx.restore()
+}
+
+type Folk = { skin: string; hair: string; shirt: string; legs: string }
+
+/** One villager per look, so neighbours never dress alike. */
+const FOLK: Folk[] = [
+  { skin: '#f2c9a0', hair: '#5a3a24', shirt: '#3f6fb5', legs: '#4a3022' },
+  { skin: '#c68e5c', hair: '#2a2630', shirt: '#c4473a', legs: '#3b3a48' },
+  { skin: '#e8b98a', hair: '#d08a2e', shirt: '#4f8f3a', legs: '#5a3a24' },
+  { skin: '#8d5a36', hair: '#2a2630', shirt: '#e8c45a', legs: '#284a7e' },
+  { skin: '#f5d3b0', hair: '#9a9aa6', shirt: '#7b4fa3', legs: '#3b3a48' },
+  { skin: '#b97a4a', hair: '#4a3022', shirt: '#2f8c8c', legs: '#4a3022' },
+]
+const villagers = new Map<number, HTMLCanvasElement>()
+
+/** A villager facing right, outlined: 9 by 15 world pixels, feet on the second row from the bottom. */
+function villagerSprite(look: number): HTMLCanvasElement {
+  const cached = villagers.get(look)
+  if (cached) return cached
+  const f = FOLK[look % FOLK.length]
+  const { canvas, ctx } = makeCanvas(7, 13)
+  const rect = (x: number, y: number, w: number, hh: number, c: string) => {
+    ctx.fillStyle = c
+    ctx.fillRect(x, y, w, hh)
+  }
+  rect(1, 0, 5, 2, f.hair)
+  rect(1, 2, 5, 3, f.skin)
+  rect(1, 2, 1, 3, f.hair)
+  rect(4, 3, 1, 1, OUTLINE)
+  rect(1, 5, 5, 5, f.shirt)
+  rect(0, 6, 1, 3, f.skin)
+  rect(6, 6, 1, 3, f.skin)
+  rect(1, 10, 2, 3, f.legs)
+  rect(4, 10, 2, 3, f.legs)
+  const sprite = withOutline(canvas, OUTLINE)
+  villagers.set(look, sprite)
+  return sprite
+}
+
+/** Draws a house's villager on its doorstep, facing away from the trunk. */
+export function drawVillager(ctx: CanvasRenderingContext2D, h: House): void {
+  const sprite = villagerSprite(h.look)
+  const at = doorstep(h)
+  const x = Math.round(at.x - sprite.width / 2)
+  const y = h.at.y - sprite.height
+  ctx.save()
+  ctx.translate(h.side > 0 ? x : x + sprite.width, y)
+  ctx.scale(h.side, 1)
+  ctx.drawImage(sprite, 0, 0)
   ctx.restore()
 }

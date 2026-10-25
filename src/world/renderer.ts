@@ -15,7 +15,19 @@ import {
   type View,
 } from './camera.ts'
 import { hitTest, type HitScene } from './hitTest.ts'
-import { RELIC_TILES, RUIN, WORLD_COLS, WORLD_H, WORLD_ROWS, WORLD_W, pxToTile, tileToPx, type Point } from './layout.ts'
+import { houseBounds, placeHouses, type House } from './houses.ts'
+import {
+  RELIC_TILES,
+  RUIN,
+  WORLD_COLS,
+  WORLD_H,
+  WORLD_ROWS,
+  WORLD_W,
+  pxToTile,
+  tileToPx,
+  type Point,
+  type TileRect,
+} from './layout.ts'
 import { computeLight, paintLight } from './lighting.ts'
 import { RELIC_SPRITES, drawOverlay, type OverlayState } from './overlay.ts'
 import { BACKDROP, LEAF, NATURAL_BARK } from './palette.ts'
@@ -33,6 +45,8 @@ export type Scene = {
   segments: readonly Segment[]
   revealedRelics: readonly RelicId[]
   inscriptionCount: number
+  /** Total LP: the wood and leaves grow with it, and from 40 LP it pays for tree houses. */
+  lp: number
   /** One colour for all the wood (trunk, branches, roots), as '#rrggbb'. */
   barkColor: string
   paintMode: boolean
@@ -49,6 +63,7 @@ const EMPTY_SCENE: Scene = {
   segments: [],
   revealedRelics: [],
   inscriptionCount: 0,
+  lp: 0,
   barkColor: NATURAL_BARK,
   paintMode: false,
   reducedMotion: false,
@@ -56,6 +71,7 @@ const EMPTY_SCENE: Scene = {
 }
 
 const GROW_MS = 900
+const HOUSE_MS = 1600
 const FRESH_MS = 2600
 const EASE_MS = 700
 const HAPPY_MS = 1500
@@ -94,7 +110,10 @@ export class WorldRenderer {
 
   private scene: Scene = EMPTY_SCENE
   private segmentsKey = ''
-  private shape: TreeShape = analyzeTree([])
+  private shape: TreeShape = analyzeTree([], 0)
+  private houses: House[] = []
+  /** When each house starts going up (ms); its villager moves in once it stands. */
+  private houseStart = new Map<string, number>()
   private view: View = { width: 0, height: 0, dpr: 1 }
   private cam: Camera = { cx: WORLD_W / 2, cy: WORLD_H / 2, zoom: 2 }
   private started = false
@@ -107,7 +126,7 @@ export class WorldRenderer {
   private overlayDirty = true
 
   /** Where the spirit sits (sprite centre, world pixels): off the top of the highest leaves. */
-  private spirit: Point = tileToPx(spiritPerch([]))
+  private spirit: Point = tileToPx(spiritPerch([], 0))
   private happyUntil = 0
   private sparkleUntil = 0
   private tint: { color: Rgb; start: number } | null = null
@@ -183,13 +202,13 @@ export class WorldRenderer {
     const prev = this.scene
     this.scene = next
     const key = segmentsKey(next.segments)
-    if (key !== this.segmentsKey) {
+    const segmentsChanged = key !== this.segmentsKey
+    if (segmentsChanged) {
       this.segmentsKey = key
       const before = new Set(prev.segments.map((s) => s.id))
       const after = new Set(next.segments.map((s) => s.id))
       const fresh = next.segments.filter((s) => !before.has(s.id))
       const removed = prev.segments.some((s) => !after.has(s.id))
-      this.shape = analyzeTree(next.segments)
       if (!this.started || removed) {
         this.growth = null
         this.needsFit = true
@@ -197,9 +216,13 @@ export class WorldRenderer {
       } else if (fresh.length > 0) {
         this.onGrowth(fresh)
       }
-      this.spirit = tileToPx(spiritPerch(next.segments))
-      this.treeDirty = true
       this.rebuildAmbient()
+    }
+    if (segmentsChanged || next.lp !== prev.lp) {
+      this.shape = analyzeTree(next.segments, next.lp)
+      this.spirit = tileToPx(spiritPerch(next.segments, next.lp))
+      this.syncHouses(this.started && !this.needsFit)
+      this.treeDirty = true
     }
     if (next.barkColor !== prev.barkColor) this.treeDirty = true
     if (!this.growth) this.revealRelics(this.started)
@@ -267,6 +290,24 @@ export class WorldRenderer {
     return this.relicsShown.includes('heartwood_relic')
   }
 
+  /**
+   * Houses LP has paid for. A new one goes up once its record's branch has
+   * grown in; on first draw, after a reset or with reduced motion it just stands.
+   */
+  private syncHouses(animate: boolean) {
+    this.houses = placeHouses(this.scene.segments, this.scene.lp)
+    const ids = new Set(this.houses.map((h) => h.id))
+    for (const id of this.houseStart.keys()) if (!ids.has(id)) this.houseStart.delete(id)
+    const now = performance.now()
+    const start = animate && !this.scene.reducedMotion ? now + GROW_MS : now - HOUSE_MS
+    for (const h of this.houses) if (!this.houseStart.has(h.id)) this.houseStart.set(h.id, start)
+  }
+
+  private houseProgress(id: string, ms: number): number {
+    const start = this.houseStart.get(id)
+    return start === undefined ? 1 : Math.min(1, Math.max(0, (ms - start) / HOUSE_MS))
+  }
+
   /** Fireflies in each branch's leaf colour, amber spores on roots, gold motes in a lit ruin. */
   private rebuildAmbient() {
     if (!this.stage) return
@@ -291,12 +332,13 @@ export class WorldRenderer {
 
   private focusOn(segments: readonly Segment[]) {
     if (this.view.width === 0) return
-    this.moveTo(fitRect(boundsToPx(segmentBounds(segments, false), FIT_MARGIN), this.view, this.cam.zoom))
+    this.moveTo(fitRect(boundsToPx(segmentBounds(segments, false, this.scene.lp), FIT_MARGIN), this.view, this.cam.zoom))
   }
 
   private fit(animate: boolean) {
     this.needsFit = false
-    const target = fitRect(boundsToPx(segmentBounds(this.scene.segments, true), FIT_MARGIN), this.view)
+    const bounds = withHouses(segmentBounds(this.scene.segments, true, this.scene.lp), this.houses)
+    const target = fitRect(boundsToPx(bounds, FIT_MARGIN), this.view)
     if (animate) this.moveTo(target)
     else {
       this.cam = target
@@ -348,6 +390,7 @@ export class WorldRenderer {
       if (age >= FRESH_MS) this.growth = null
       this.treeDirty = true
     }
+    if (this.houses.some((h) => this.houseProgress(h.id, ms) < 1)) this.treeDirty = true
     if (this.treeDirty && this.kit) this.redrawTree(ms)
     if (this.overlayDirty) this.redrawOverlay()
 
@@ -378,6 +421,8 @@ export class WorldRenderer {
       wood: woodIn(this.kit!, this.scene.barkColor),
       barkColor: this.scene.barkColor,
       level: this.scene.segments.filter((s) => s.kind === 'branch').length,
+      lp: this.scene.lp,
+      houses: this.houses.map((house) => ({ house, progress: this.houseProgress(house.id, ms) })),
     })
     paintLight(this.layers.light.getContext('2d')!, computeLight(segments, this.relicsShown, this.ruinLit()))
     this.treeDirty = false
@@ -411,7 +456,7 @@ export class WorldRenderer {
       hover = { canvas: spriteCanvas(RELIC_SPRITES[h.id]), x: p.x - 8, y: p.y - 8 }
     } else if (h?.kind === 'segment' && this.kit) {
       const seg = this.scene.segments.find((s) => s.id === h.id)
-      if (seg) hover = clusterAt(this.kit, seg)
+      if (seg) hover = clusterAt(this.kit, seg, this.scene.lp)
     }
     return { relics: this.relicsShown, ruinLit: this.ruinLit(), inscriptions: this.scene.inscriptionCount, hover }
   }
@@ -478,6 +523,7 @@ export class WorldRenderer {
       segments: this.scene.segments,
       revealedRelics: this.relicsShown,
       ruinLit: this.ruinLit(),
+      lp: this.scene.lp,
     }
   }
 
@@ -622,6 +668,18 @@ function drawCell(
   ctx.scale(-1, 1)
   ctx.drawImage(img, sx, sy, w, h, 0, 0, w, h)
   ctx.restore()
+}
+
+/** r grown to take in the houses, roofs and struts included. */
+function withHouses(r: TileRect, houses: readonly House[]): TileRect {
+  const h = houseBounds(houses)
+  if (!h) return r
+  return {
+    left: Math.min(r.left, h.left),
+    right: Math.max(r.right, h.right),
+    top: Math.min(r.top, h.top),
+    bottom: Math.max(r.bottom, h.bottom),
+  }
 }
 
 function midpoint(a: Point, b: Point): Point {

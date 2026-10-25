@@ -20,6 +20,8 @@ export type TreeCanvasProps = {
   revealedRelics?: readonly RelicId[]
   /** Reflections with text or mood; that many tablet lines glow in the lit ruin. */
   inscriptionCount?: number
+  /** totalLP(state): the wood and leaves grow with it, and from 40 LP it builds tree houses. */
+  lp?: number
   /** One colour for all the wood (trunk, branches, roots), as '#rrggbb'; the kit's natural bark if left out. */
   barkColor?: string
   /** Highlights leaf clusters on hover. */
@@ -38,6 +40,7 @@ export default function TreeCanvas({
   segments = NONE,
   revealedRelics = NONE,
   inscriptionCount = 0,
+  lp = 0,
   barkColor = NATURAL_BARK,
   paintMode = false,
   reducedMotion = false,
@@ -62,12 +65,13 @@ export default function TreeCanvas({
       segments,
       revealedRelics,
       inscriptionCount,
+      lp,
       barkColor,
       paintMode,
       reducedMotion,
       spiritEnabled,
     })
-  }, [segments, revealedRelics, inscriptionCount, barkColor, paintMode, reducedMotion, spiritEnabled])
+  }, [segments, revealedRelics, inscriptionCount, lp, barkColor, paintMode, reducedMotion, spiritEnabled])
 
   useEffect(() => {
     if (rendererRef.current) rendererRef.current.events = { onSelect }

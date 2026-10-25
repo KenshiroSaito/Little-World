@@ -1,4 +1,5 @@
 import type { Segment } from '../types.ts'
+import { drawHouse, drawVillager, type House } from './houses.ts'
 import { SAPLING, TILE, WORLD_H, WORLD_W, tileToPx, type Point } from './layout.ts'
 import { BARK, LEAF, ROOT, packHex } from './palette.ts'
 import { hashString, mulberry32 } from './rng.ts'
@@ -20,6 +21,10 @@ export type TreeDraw = {
   barkColor: string
   /** One per record: the canopy fills in as it rises, and the sign by the trunk shows it. */
   level: number
+  /** Total LP: leaf clusters grow with it. */
+  lp: number
+  /** Tree houses, each built up to `progress` (0 to 1); a villager moves in once it stands. */
+  houses: readonly { house: House; progress: number }[]
 }
 
 type Stroke = {
@@ -44,14 +49,15 @@ const SPRIG_EVERY = 8
 const MAX_SPRIGS = 3
 /** Branches longer than this (tiles) carry a second cluster partway along. */
 const MID_CLUSTER_LEN = 2.6
-/** From this level on, tip clusters are a size bigger. */
-const LUSH_LEVEL = 20
+/** From this level on, mid clusters are a size bigger. Tip clusters grow with LP instead (treeGrowth). */
+const LUSH_LEVEL = 10
 
 /**
  * Redraws the tree layer and its glow layer. Segment geometry is B's; every
  * pixel of wood and leaf comes from the module kit: bark is texture-mapped
  * along each stroke, then the root flare, branch-type twigs, side sprigs and
- * leaf clusters are stamped on, then the level sign.
+ * leaf clusters are stamped on, then tree houses and their villagers, then the
+ * level sign.
  */
 export function drawTree(tree: CanvasRenderingContext2D, glow: CanvasRenderingContext2D, kit: TreeKit, d: TreeDraw): void {
   tree.clearRect(0, 0, WORLD_W, WORLD_H)
@@ -117,23 +123,24 @@ export function drawTree(tree: CanvasRenderingContext2D, glow: CanvasRenderingCo
   }
   for (const s of d.segments) {
     if (s.kind !== 'branch' || progress(s) < LEAF_AT || length(s) < MID_CLUSTER_LEN) continue
-    const size = d.level >= LUSH_LEVEL / 2 ? 2 : 1
+    const size = d.level >= LUSH_LEVEL ? 2 : 1
     stamp(s, leafCluster(kit, s.leafColor ?? 'base', size, leafVariant(s.id) + 1), tileToPx(lerp(s.from, s.to, 0.55)))
   }
   for (const s of d.segments) {
     if (s.kind !== 'branch') continue
     const t = progress(s)
     if (t < BUD_AT) continue
-    const size = t < LEAF_AT ? 1 : tipSize(s, d.level)
+    const size = t < LEAF_AT ? 1 : leafSize(s.id, d.lp)
     stamp(s, leafCluster(kit, s.leafColor ?? 'base', size, leafVariant(s.id)), tileToPx(s.to))
   }
 
-  drawLevelSign(tree, d.level, d.barkColor)
-}
+  for (const { house, progress: p } of d.houses) {
+    drawHouse(tree, house, d.barkColor, p)
+    drawHouse(glow, house, d.barkColor, p, true)
+    if (p >= 1) drawVillager(tree, house)
+  }
 
-/** Tip cluster size: the segment's own, one bigger once the tree is lush. */
-function tipSize(s: Segment, level: number): 1 | 2 | 3 {
-  return Math.min(3, leafSize(s.id) + (level >= LUSH_LEVEL ? 1 : 0)) as 1 | 2 | 3
+  drawLevelSign(tree, d.level, d.barkColor)
 }
 
 /**
@@ -213,8 +220,8 @@ function lerp(a: Point, b: Point, t: number): Point {
 }
 
 /** The drawn leaf cluster of a branch segment and where it sits, for hover outlines. */
-export function clusterAt(kit: TreeKit, s: Segment): { canvas: HTMLCanvasElement; x: number; y: number } {
-  const canvas = leafCluster(kit, s.leafColor ?? 'base', leafSize(s.id), leafVariant(s.id))
+export function clusterAt(kit: TreeKit, s: Segment, lp: number): { canvas: HTMLCanvasElement; x: number; y: number } {
+  const canvas = leafCluster(kit, s.leafColor ?? 'base', leafSize(s.id, lp), leafVariant(s.id))
   const tip = tileToPx(s.to)
   return { canvas, x: Math.round(tip.x - canvas.width / 2), y: Math.round(tip.y - canvas.height / 2) }
 }
