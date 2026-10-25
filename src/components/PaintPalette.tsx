@@ -91,7 +91,7 @@ export default function PaintPalette({
       <button onClick={onUndo} disabled={!canUndo}>
         Undo
       </button>
-      <button onClick={onDone}>Done</button>
+      <button className="btn-primary" onClick={onDone}>Done</button>
     </div>
   );
 }

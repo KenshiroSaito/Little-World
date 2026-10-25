@@ -8,7 +8,7 @@ export default function SpiritBubble({ message, onClose }: Props) {
   return (
     <div className="spirit-bubble" role="status">
       <p>{message}</p>
-      <button onClick={onClose} aria-label="Dismiss the spirit's message">
+      <button className="btn-icon" onClick={onClose} aria-label="Dismiss the spirit's message">
         ×
       </button>
     </div>

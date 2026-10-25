@@ -61,11 +61,13 @@ export default function SelfCarePanel({ onClose }: Props) {
               ))}
             </select>
           </label>
-          <button onClick={() => recordAndClose("reflect")}>Save reflection</button>
+          <button className="btn-primary" onClick={() => recordAndClose("reflect")}>Save reflection</button>
         </div>
       )}
 
-      <button onClick={onClose}>Close</button>
+      <button className="btn-icon panel-close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
     </div>
   );
 }

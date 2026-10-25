@@ -8,7 +8,7 @@ export default function TitleScreen({ hasSave, onStart }: Props) {
     <div className="title-screen">
       <h1>Little World</h1>
       <p>Take care of yourself. Watch what grows.</p>
-      <button onClick={onStart}>{hasSave ? "Continue" : "Start"}</button>
+      <button className="title-start" onClick={onStart}>{hasSave ? "Continue" : "Start"}</button>
     </div>
   );
 }

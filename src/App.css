@@ -64,15 +64,44 @@
 
 .palette {
   position: absolute;
-  bottom: 12px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 8px;
+  padding: 10px;
+  border: 1px solid #5f5040;
+  border-radius: 10px;
+  background: #2a2420;
 }
 
+.palette button {
+  white-space: nowrap;
+}
+
+/* Selected colour: gold ring with a gap, like the swatch is picked up. */
 .palette button[aria-pressed="true"] {
-  outline: 2px solid #f2c46d;
+  border-color: #f2c46d;
+  box-shadow:
+    0 0 0 2px #2a2420,
+    0 0 0 4px #f2c46d;
+}
+
+/* Divider between the colours and Undo / Done. */
+.palette button:nth-last-child(2) {
+  position: relative;
+  margin-left: 9px;
+}
+
+.palette button:nth-last-child(2)::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: #5f5040;
 }
 
 /* RGB mixer: sits just above the palette while Mix is open. */
@@ -141,18 +170,27 @@
 }
 
 .hud-zoom {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
   display: flex;
-  gap: 4px;
-  margin-left: 8px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hud-zoom button {
+  width: 48px;
+  height: 48px;
 }
 
 .palette .swatch {
   display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 6px;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
   border-radius: 3px;
-  vertical-align: -1px;
+  vertical-align: -4px;
 }
 
 .relic-list,
@@ -192,13 +230,73 @@
   margin: 8px 0;
 }
 
+.panel > h2 {
+  margin-right: 56px;
+}
+
+.panel-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.activity-list button {
+  width: 100%;
+  min-height: 56px;
+  text-align: left;
+  background: #332a23;
+}
+
+.activity-list button:hover:not(:disabled) {
+  background: #3d332b;
+}
+
+.reflect-form .btn-primary {
+  width: 100%;
+}
+
 .spirit-bubble p {
   margin: 0;
 }
 
 .spirit-bubble button {
+  flex: none;
   align-self: flex-start;
-  padding: 2px 8px;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  border-color: #3a2f27;
+  background: #e8dcc0;
+  color: #2b2117;
+  font-size: 18px;
+}
+
+.spirit-bubble button:hover:not(:disabled) {
+  border-color: #2b2117;
+  background: #dccfae;
+}
+
+/* Title: a pixel-font "▶ Start" link rather than a boxed button. */
+.title-start {
+  border: none;
+  background: none;
+  color: #f2c46d;
+  font-family: "VT323", "Courier New", monospace;
+  font-size: 44px;
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+.title-start::before {
+  content: "▶ ";
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+}
+
+.title-start:hover:not(:disabled) {
+  border: none;
+  background: none;
+  color: #f7d48c;
 }
 
 /* Journal: a Minecraft-style book over a dimmed world. */
@@ -299,6 +397,7 @@
 .book-arrow {
   position: absolute;
   bottom: 16px;
+  min-height: 0;
   padding: 4px;
   border: none;
   border-radius: 0;
@@ -325,6 +424,8 @@
 
 .book-done {
   width: 220px;
+  min-height: 0;
+  font-weight: normal;
   padding: 6px 0 8px;
   border: 2px solid #000;
   border-radius: 0;

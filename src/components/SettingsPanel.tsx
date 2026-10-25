@@ -44,7 +44,9 @@ export default function SettingsPanel({ onClose }: Props) {
         If you are struggling, you are not alone: UVic Counselling Services, or call or text
         9-8-8 (Suicide Crisis Helpline, Canada).
       </p>
-      <button onClick={onClose}>Close</button>
+      <button className="btn-icon panel-close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
     </div>
   );
 }

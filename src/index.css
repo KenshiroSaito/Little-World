@@ -20,17 +20,56 @@ body,
 
 button {
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  padding: 6px 12px;
-  border: 1px solid #5a4a3a;
-  border-radius: 6px;
-  background: #3a2f27;
-  color: #e8e2d0;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #5f5040;
+  border-radius: 8px;
+  background: #241e19;
+  color: #f3ecdc;
+  line-height: 1.2;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+}
+
+/* :where keeps these at element specificity, so any class can restyle them. */
+button:where(:hover:not(:disabled)) {
+  background: #332a23;
+  border-color: #7a6650;
+}
+
+button:where(:active:not(:disabled)) {
+  transform: translateY(1px);
 }
 
 button:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* Gold: the main action, or a toggle that is on. */
+.btn-primary,
+.hud button[aria-pressed="true"] {
+  border-color: #f2c46d;
+  background: #f2c46d;
+  color: #2b2117;
+}
+
+.btn-primary:hover:not(:disabled),
+.hud button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: #f7d48c;
+  background: #f7d48c;
+}
+
+/* Square icon button: close, zoom, fit. */
+.btn-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
 }
 
 button:focus-visible,

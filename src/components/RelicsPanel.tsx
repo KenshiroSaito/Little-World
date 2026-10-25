@@ -45,7 +45,9 @@ export default function RelicsPanel({ onClose }: Props) {
         </ol>
       )}
 
-      <button onClick={onClose}>Close</button>
+      <button className="btn-icon panel-close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
     </div>
   );
 }
