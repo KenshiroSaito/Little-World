@@ -10,14 +10,14 @@ import SpiritBubble from "./components/SpiritBubble";
 import DemoControls from "./components/DemoControls";
 import TreeCanvas, { type TreeCanvasHandle } from "./world/TreeCanvas";
 import { useGame } from "./state/GameProvider";
-import type { CanvasSelection, ColorId } from "./types";
+import type { CanvasSelection, LeafColor } from "./types";
 import "./App.css";
 
 type Screen = "title" | "tree";
 export type PanelId = "selfCare" | "journal" | "relics" | "settings";
 
 /** One paint action, remembered so Undo can put the previous colour back. */
-type PaintStep = { segmentId: string; previous: ColorId | null };
+type PaintStep = { segmentId: string; previous: LeafColor | null };
 
 const DEMO_MODE = new URLSearchParams(window.location.search).has("demo");
 
@@ -29,7 +29,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("title");
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [paintMode, setPaintMode] = useState(false);
-  const [paintColor, setPaintColor] = useState<ColorId>("base");
+  const [paintColor, setPaintColor] = useState<LeafColor>("base");
   const [paintHistory, setPaintHistory] = useState<PaintStep[]>([]);
 
   const closePanel = () => setOpenPanel(null);
