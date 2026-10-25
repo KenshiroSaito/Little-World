@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ACTIVITIES } from "../game/activities";
 import { MOODS } from "../game/moods";
-import { MAX_REFLECTION_LENGTH } from "../game/rules";
+import { MAX_REFLECTION_IMAGES, MAX_REFLECTION_LENGTH } from "../game/rules";
 import { useGame } from "../state/GameProvider";
+import { saveImage } from "../state/images";
 import type { ActivityId, MoodTag } from "../types";
+import { PhotoPreview } from "./ReflectionImages";
 
 type Props = {
   onClose: () => void;
@@ -14,10 +16,28 @@ export default function SelfCarePanel({ onClose }: Props) {
   const [reflectOpen, setReflectOpen] = useState(false);
   const [text, setText] = useState("");
   const [mood, setMood] = useState<MoodTag | "">("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
 
   function recordAndClose(activityId: ActivityId) {
-    record(activityId, activityId === "reflect" ? { text, mood: mood || undefined } : {});
+    record(activityId);
     onClose();
+  }
+
+  /** Photos are kept first, so the reflection is only recorded with photos that were really saved. */
+  async function saveReflection() {
+    setSaving(true);
+    setPhotoError(false);
+    try {
+      const images = await Promise.all(photos.map(saveImage));
+      record("reflect", { text, mood: mood || undefined, images });
+      onClose();
+    } catch (error) {
+      console.warn("Unable to keep the reflection's photos", error);
+      setPhotoError(true);
+      setSaving(false);
+    }
   }
 
   return (
@@ -61,7 +81,32 @@ export default function SelfCarePanel({ onClose }: Props) {
               ))}
             </select>
           </label>
-          <button className="btn-primary" onClick={() => recordAndClose("reflect")}>Save reflection</button>
+          <label>
+            Photos (optional, up to {MAX_REFLECTION_IMAGES})
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={photos.length >= MAX_REFLECTION_IMAGES}
+              onChange={(e) => {
+                const picked = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+                setPhotos((list) => [...list, ...picked].slice(0, MAX_REFLECTION_IMAGES));
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {photos.length > 0 && (
+            <div className="photo-previews">
+              {photos.map((file, i) => (
+                <PhotoPreview key={`${file.name}-${file.lastModified}-${i}`} file={file} onRemove={() => setPhotos((list) => list.filter((_, j) => j !== i))} />
+              ))}
+            </div>
+          )}
+          {photoError && <p role="alert">Those photos could not be kept on this device. Try again, or save without them.</p>}
+          <p className="reflect-note">Each reflection buries a keepsake at the tip of its root. Find it in Relics.</p>
+          <button className="btn-primary" disabled={saving} onClick={saveReflection}>
+            {saving ? "Saving…" : "Save reflection"}
+          </button>
         </div>
       )}
 

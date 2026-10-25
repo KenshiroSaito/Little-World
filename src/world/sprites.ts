@@ -67,6 +67,28 @@ export const SPRITES = {
       '................',
     ],
   },
+  // A reflection's keepsake, in Reflect's lavender, buried at the tip of its root.
+  keepsake: {
+    colors: { o: '#4a1f55', d: '#8a3f99', m: '#ba68c8', l: '#e6b8ee', w: '#ffffff' },
+    rows: [
+      '................',
+      '................',
+      '.......oo.......',
+      '......olmo......',
+      '.....olwmdo.....',
+      '....olwmmmdo....',
+      '...olllmmmmdo...',
+      '...olmmmmmmdo...',
+      '..olmmmmmmmmdo..',
+      '..olmmmmmmmddo..',
+      '...olmmmmmddo...',
+      '....olmmmddo....',
+      '.....oddddo.....',
+      '......oooo......',
+      '................',
+      '................',
+    ],
+  },
   rubble: {
     colors: { o: RUIN_STONE.mortar, l: RUIN_STONE.light, m: RUIN_STONE.mid, d: RUIN_STONE.dark },
     rows: [

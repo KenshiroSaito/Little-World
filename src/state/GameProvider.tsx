@@ -6,6 +6,7 @@ import { inscriptions, revealedRelics, ruinReached, totalLP, unlockedColors } fr
 import { doneToday } from '../game/rules';
 import { spiritMessage } from '../game/spirit';
 import { gameReducer, initialGameState } from './gameReducer';
+import { clearImages } from './images';
 import { loadGame, saveGame } from './persistence';
 
 export interface GameContextValue {
@@ -22,7 +23,7 @@ export interface GameContextValue {
   doneToday: ActivityId[];
   spiritMessage: string | null;
   // Helpers that add the current time, so components never build actions by hand.
-  record: (activityId: ActivityId, extras?: { text?: string; mood?: MoodTag }) => void;
+  record: (activityId: ActivityId, extras?: { text?: string; mood?: MoodTag; images?: string[] }) => void;
   paintLeaves: (segmentId: string, colorId: LeafColor | null) => void;
   markSpiritShown: () => void;
 }
@@ -32,6 +33,11 @@ const GameContext = createContext<GameContextValue | null>(null);
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, initialGameState, () => loadGame() ?? initialGameState);
   useEffect(() => { saveGame(state); }, [state]);
+  // A new or reset game has no reflections, so no photos to keep.
+  const noLogs = state.selfCareLogs.length === 0;
+  useEffect(() => {
+    if (noLogs) clearImages().catch(error => console.warn('Unable to clear kept photos', error));
+  }, [noLogs]);
 
   // buildTree only reruns when the logs or the paint change.
   const segments = useMemo(() => buildTree(state.selfCareLogs, state.leafPaint), [state.selfCareLogs, state.leafPaint]);

@@ -13,7 +13,9 @@ import {
 } from './camera.ts'
 import { FIXTURE_SEGMENTS } from './fixtures.ts'
 import { hitTest } from './hitTest.ts'
-import { RELIC_TILES, RUIN, STONE_TOP, TABLET, WORLD, WORLD_COLS, WORLD_H, WORLD_W } from './layout.ts'
+import { HANDS, bunchAt, buildPlayerWorld, nearestLimb, spawnPlayer, stepPlayer, type Player } from './player.ts'
+import { frameShifts } from './spirit.ts'
+import { RELIC_TILES, RUIN, STONE_TOP, TABLET, WORLD, WORLD_COLS, WORLD_H, WORLD_W, tileToPx } from './layout.ts'
 import { computeLight } from './lighting.ts'
 import { houseCount, npcSpot, placeHouses } from './houses.ts'
 import { NPCS, NPC_ORDER, npcFrame } from './npcs.ts'
@@ -252,5 +254,69 @@ describe('tree kit', () => {
     // 4x2: column 0 has a gap, columns 1 and 2 are solid, column 3 is clear.
     const px = { w: 4, h: 2, data: Uint32Array.from([0, o | 1, o | 2, 0, o, o | 3, o | 4, 0]) }
     expect(solidColumns(px)).toEqual({ w: 2, h: 2, data: Uint32Array.from([o | 1, o | 2, o | 3, o | 4]) })
+  })
+})
+
+describe('player', () => {
+  const still = { left: false, right: false, up: false, down: false, jump: false }
+  const world = () => buildPlayerWorld(FIXTURE_SEGMENTS, analyzeTree(FIXTURE_SEGMENTS, 40), 40, [])
+  /** Steps a frame at a time, as the renderer does (stepPlayer takes at most 0.1 s per call). */
+  const run = (p: Player, input: typeof still, seconds: number) => {
+    const w = world()
+    for (let t = 0; t < seconds; t += 1 / 60) p = stepPlayer(p, input, w, 1 / 60)
+    return p
+  }
+
+  it('stands on the grass, walks, and jumps back down to it', () => {
+    const w = world()
+    let p = spawnPlayer(w)
+    expect(p.y).toBe(w.ground)
+    const x = p.x
+    p = run(p, { ...still, right: true }, 0.5)
+    expect(p.x).toBeGreaterThan(x)
+    expect(p.facing).toBe(1)
+    p = run(p, { ...still, jump: true }, 0.2)
+    expect(p.mode).toBe('air')
+    expect(p.y).toBeLessThan(w.ground)
+    p = run(p, still, 1.5)
+    expect(p.mode).toBe('ground')
+    expect(p.y).toBe(w.ground)
+  })
+
+  it('climbs the trunk, stays on it, and lets go with a jump', () => {
+    const w = world()
+    let p = { ...spawnPlayer(w), x: tileToPx({ x: 0, y: 0 }).x }
+    p = run(p, { ...still, up: true }, 0.1)
+    expect(p.mode).toBe('climb')
+    p = run(p, { ...still, up: true }, 1)
+    expect(p.y).toBeLessThan(w.ground - 30)
+    const near = nearestLimb(w.limbs, { x: p.x, y: p.y - HANDS }, null)!
+    expect(near.dist).toBeLessThanOrEqual(near.limb.reach + 0.01)
+    p = run(p, { ...still, jump: true }, 0.05)
+    expect(p.mode).toBe('air')
+  })
+
+  it('climbs down into the roots but cannot let go underground', () => {
+    const w = world()
+    let p = { ...spawnPlayer(w), x: tileToPx({ x: 0, y: 0 }).x }
+    p = run(p, { ...still, down: true }, 0.5)
+    expect(p.mode).toBe('climb')
+    expect(p.y - HANDS).toBeGreaterThan(w.ground)
+    p = run(p, { ...still, jump: true }, 0.1)
+    expect(p.mode).toBe('climb')
+  })
+
+  it('finds the leaf bunch the spirit is at', () => {
+    const branch = FIXTURE_SEGMENTS.find((s) => s.kind === 'branch')!
+    const tip = tileToPx(branch.to)
+    const p = { ...spawnPlayer(world()), x: tip.x, y: tip.y + HANDS }
+    expect(bunchAt(FIXTURE_SEGMENTS, 40, p)).not.toBeNull()
+  })
+
+  it('moves accessories with the body from frame to frame', () => {
+    // Two 3x3 frames, the second with its pixel one to the right and one down.
+    const cell = { w: 3, h: 3 }
+    const alpha = [255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0]
+    expect(frameShifts(alpha, 6, cell, 0, 2)).toEqual([{ x: 0, y: 0 }, { x: 1, y: 1 }])
   })
 })

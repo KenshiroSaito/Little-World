@@ -1,6 +1,7 @@
 import ShopPanel from './shop/ShopPanel';
-import { shopBalance } from './shop/inventory';
-import { useRef, useState } from "react";
+import { isAccessory } from './shop/catalog';
+import { shopBalance, wornItems } from './shop/inventory';
+import { useMemo, useRef, useState } from "react";
 import TitleScreen from "./components/TitleScreen";
 import Hud from "./components/Hud";
 import SelfCarePanel from "./components/SelfCarePanel";
@@ -36,10 +37,23 @@ export default function App() {
   const [paintHistory, setPaintHistory] = useState<PaintStep[]>([]);
 
   const [placingItem, setPlacingItem] = useState<string | null>(null);
-  const purchases = state.shopPurchases ?? [];
+  const purchases = useMemo(() => state.shopPurchases ?? [], [state.shopPurchases]);
   const balance = shopBalance(game.totalLP, purchases);
+  const outfit = useMemo(() => wornItems(purchases), [purchases]);
+  // Every reflection buries a keepsake at the tip of its root.
+  const keepsakes = useMemo(
+    () => state.selfCareLogs.filter((log) => log.activityId === "reflect").map((log) => log.id),
+    [state.selfCareLogs],
+  );
+  /** The record the journal or relics open on: its leaves or keepsake were clicked. */
+  const [focusLog, setFocusLog] = useState<string | null>(null);
 
   const closePanel = () => setOpenPanel(null);
+
+  function openPanelAt(panel: PanelId, logId: string | null) {
+    setFocusLog(logId);
+    setOpenPanel(panel);
+  }
 
   function handleCanvasSelect(selection: CanvasSelection) {
     if (placingItem && selection.kind === "segment") {
@@ -53,8 +67,13 @@ export default function App() {
       game.paintLeaves(selection.id, paintColor);
       return;
     }
-    if (selection.kind === "relic" || selection.kind === "tablet") {
-      setOpenPanel("relics");
+    if (selection.kind === "segment") {
+      // A branch's id is its record's id plus ":b": open the journal on that record.
+      openPanelAt("journal", selection.id.replace(/:b$/, ""));
+    } else if (selection.kind === "reflection") {
+      openPanelAt("relics", selection.id);
+    } else {
+      openPanelAt("relics", null);
     }
   }
 
@@ -91,7 +110,8 @@ export default function App() {
         inscriptionCount={game.inscriptions.length}
         lp={game.totalLP}
         purchases={purchases}
-        paintMode={paintMode || placingItem !== null}
+        outfit={outfit}
+        keepsakes={keepsakes}
         reducedMotion={state.settings.reducedMotion}
         spiritEnabled={state.spirit.enabled}
       />
@@ -102,7 +122,7 @@ export default function App() {
         onOpenPanel={(panel) => {
           setPlacingItem(null);
           setPaintMode(false);
-          setOpenPanel(panel);
+          openPanelAt(panel, null);
         }}
         onTogglePaint={togglePaint}
         onZoomIn={() => canvas.current?.zoomIn()}
@@ -124,9 +144,15 @@ export default function App() {
       {openPanel === "shop" && <ShopPanel
         balance={balance}
         purchases={purchases}
-        onBuy={itemId => game.dispatch({ type: "buyItem", itemId, id: crypto.randomUUID() })}
+        onBuy={itemId => {
+          const id = crypto.randomUUID();
+          game.dispatch({ type: "buyItem", itemId, id });
+          // Accessories go straight on the spirit.
+          if (isAccessory(itemId)) game.dispatch({ type: "wearItem", purchaseId: id, worn: true });
+        }}
         onPlace={purchaseId => { setPlacingItem(purchaseId); setPaintMode(false); closePanel(); }}
         onStore={purchaseId => game.dispatch({ type: "placeItem", purchaseId, segmentId: null })}
+        onWear={(purchaseId, worn) => game.dispatch({ type: "wearItem", purchaseId, worn })}
         onClose={closePanel}
       />}
       {placingItem && <div className="shop-placement" role="status">
@@ -134,8 +160,27 @@ export default function App() {
         <button onClick={() => setPlacingItem(null)}>Cancel</button>
       </div>}
       {openPanel === "selfCare" && <SelfCarePanel onClose={closePanel} />}
-      {openPanel === "journal" && <JournalBook onClose={closePanel} />}
-      {openPanel === "relics" && <RelicsPanel onClose={closePanel} />}
+      {openPanel === "journal" && (
+        <JournalBook
+          key={focusLog ?? "newest"}
+          focusLogId={focusLog}
+          onClose={closePanel}
+          onShowOnTree={(logId) => {
+            closePanel();
+            canvas.current?.focusBranch(`${logId}:b`);
+          }}
+        />
+      )}
+      {openPanel === "relics" && (
+        <RelicsPanel
+          focusLogId={focusLog}
+          onClose={closePanel}
+          onShowOnTree={(logId) => {
+            closePanel();
+            canvas.current?.focusKeepsake(logId);
+          }}
+        />
+      )}
       {openPanel === "settings" && <SettingsPanel onClose={closePanel} />}
 
       {state.spirit.enabled && (

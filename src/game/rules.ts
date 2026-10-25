@@ -2,6 +2,8 @@ import type { ActivityId, GameState, MoodTag, SelfCareLog } from '../types';
 import { LP_PER_ACTIVITY } from './activities';
 
 export const MAX_REFLECTION_LENGTH = 120;
+/** Photos a reflection can keep. */
+export const MAX_REFLECTION_IMAGES = 3;
 
 /**
  * Local calendar date as YYYY-MM-DD. Uses local getters, not toISOString(),
@@ -28,7 +30,7 @@ export function recordActivity(
   state: GameState,
   activityId: ActivityId,
   now: string,
-  extras: { text?: string; mood?: MoodTag } = {},
+  extras: { text?: string; mood?: MoodTag; images?: readonly string[] } = {},
 ): GameState {
   const date = localDate(new Date(now), state.dayOffset);
   const earlier = state.selfCareLogs.filter(log => log.date === date && log.activityId === activityId).length;
@@ -45,6 +47,8 @@ export function recordActivity(
     const text = extras.text?.trim().slice(0, MAX_REFLECTION_LENGTH);
     if (text) log.text = text;
     if (extras.mood) log.mood = extras.mood;
+    const images = extras.images?.filter(id => typeof id === 'string' && id.length > 0).slice(0, MAX_REFLECTION_IMAGES);
+    if (images?.length) log.images = images;
   }
   return { ...state, selfCareLogs: [...state.selfCareLogs, log] };
 }

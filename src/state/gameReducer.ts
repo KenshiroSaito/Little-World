@@ -1,6 +1,7 @@
-import { isCustomColor, type GameAction, type GameState } from '../types';
-import { localDate, recordActivity } from '../game/rules';
-import { buyItem } from '../shop/inventory';
+import { isCustomColor, type GameAction, type GameState, type SelfCareLog } from '../types';
+import { MAX_REFLECTION_IMAGES, localDate, recordActivity } from '../game/rules';
+import { buyItem, wearItem } from '../shop/inventory';
+import { isAccessory } from '../shop/catalog';
 import { buildTree } from '../game/buildTree';
 import { totalLP } from '../game/progression';
 import { unlockedColors } from '../game/progression';
@@ -24,12 +25,34 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'placeItem': {
       if (action.segmentId !== null && !buildTree(state.selfCareLogs).some(s => s.kind === 'branch' && s.id === action.segmentId)) return state;
-      if (!state.shopPurchases?.some(p => p.id === action.purchaseId)) return state;
-      return { ...state, shopPurchases: state.shopPurchases.map(p => p.id === action.purchaseId ? { ...p, segmentId: action.segmentId } : p) };
+      const purchase = state.shopPurchases?.find(p => p.id === action.purchaseId);
+      // Accessories are worn by the spirit, never hung on branches.
+      if (!purchase || isAccessory(purchase.itemId)) return state;
+      return { ...state, shopPurchases: state.shopPurchases!.map(p => p.id === action.purchaseId ? { ...p, segmentId: action.segmentId } : p) };
+    }
+
+    case 'wearItem': {
+      const purchases = wearItem(state.shopPurchases ?? [], action.purchaseId, action.worn);
+      return purchases ? { ...state, shopPurchases: purchases } : state;
+    }
+
+    case 'setImages': {
+      const images = action.images.filter(id => typeof id === 'string' && id.length > 0).slice(0, MAX_REFLECTION_IMAGES);
+      const log = state.selfCareLogs.find(l => l.id === action.logId);
+      if (!log || log.activityId !== 'reflect' || (log.images ?? []).join() === images.join()) return state;
+      return {
+        ...state,
+        selfCareLogs: state.selfCareLogs.map(l => {
+          if (l !== log) return l;
+          const next: SelfCareLog = { ...l, images };
+          if (images.length === 0) delete next.images;
+          return next;
+        }),
+      };
     }
 
     case 'record':
-      return recordActivity(state, action.activityId, action.now, { text: action.text, mood: action.mood });
+      return recordActivity(state, action.activityId, action.now, { text: action.text, mood: action.mood, images: action.images });
 
     case 'paint': {
       if (action.colorId === null) {

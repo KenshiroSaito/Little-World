@@ -1,23 +1,26 @@
 import type { RelicId } from '../types.ts'
-import { RELIC_TILES, RUIN, TABLET, TILE, tileToPx } from './layout.ts'
+import { RELIC_TILES, RUIN, TABLET, TILE, tileToPx, type Point } from './layout.ts'
 import { GLYPH_GLOW, HIGHLIGHT, RUIN_GLOW } from './palette.ts'
 import { haloCanvas, outlineCanvas, spriteCanvas, type SpriteName } from './sprites.ts'
 import { tabletGlyphLines } from './terrain.ts'
 
 export const RELIC_SPRITES: Record<RelicId, SpriteName> = { carved_stone: 'carvedStone', heartwood_relic: 'heartwood' }
 const RELIC_HALO: Record<RelicId, string> = { carved_stone: '140, 240, 215', heartwood_relic: '255, 200, 110' }
+const KEEPSAKE_HALO = '230, 184, 238'
 
 export type OverlayState = {
   relics: readonly RelicId[]
   ruinLit: boolean
   inscriptions: number
+  /** Where each reflection's keepsake is buried, in tiles. */
+  keepsakes: readonly Point[]
   /** What the pointer is over: an outline sprite at a world position, or the tablet. */
   hover: { canvas: HTMLCanvasElement; x: number; y: number } | 'tablet' | null
 }
 
 /**
  * Things drawn above the darkness: the lit ruin, carved lines for each
- * reflection, relics and the hover outline. With `glow`, the same things as
+ * reflection, each reflection's keepsake, relics and the hover outline. With `glow`, the same things as
  * light sources for the bloom pass.
  */
 export function drawOverlay(ctx: CanvasRenderingContext2D, s: OverlayState, glow: boolean): void {
@@ -34,6 +37,13 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, s: OverlayState, glow
     for (let i = 0; i < Math.min(lines.length, s.inscriptions); i++) {
       for (const p of lines[i]) ctx.fillRect(p.x, p.y, 1, 1)
     }
+  }
+
+  for (const at of s.keepsakes) {
+    const p = tileToPx(at)
+    const halo = haloCanvas(12, KEEPSAKE_HALO)
+    ctx.drawImage(halo, p.x - halo.width / 2, p.y - halo.height / 2)
+    ctx.drawImage(spriteCanvas('keepsake'), p.x - 8, p.y - 8)
   }
 
   for (const id of s.relics) {

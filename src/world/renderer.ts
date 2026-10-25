@@ -1,5 +1,6 @@
 import { TreeDecorations } from '../shop/decorations';
 import type { ShopPurchase } from '../shop/inventory';
+import { DRESS, SpiritOutfit } from '../shop/outfit';
 import type { CanvasSelection, RelicId, Segment } from '../types.ts'
 import { SPIRIT_ANIMS, SPIRIT_CELL } from './artLayout.ts'
 import spiritSheetUrl from './assets/spirit-sheet.png'
@@ -36,8 +37,18 @@ import { NPCS, npcFrame, type NpcId } from './npcs.ts'
 import { RELIC_SPRITES, drawOverlay, type OverlayState } from './overlay.ts'
 import { BACKDROP, LEAF, NATURAL_BARK, leafShades } from './palette.ts'
 import type { Ambient, Rgb } from './particles.ts'
+import {
+  NO_INPUT,
+  bunchAt,
+  buildPlayerWorld,
+  spawnPlayer,
+  stepPlayer,
+  type Player,
+  type PlayerInput,
+  type PlayerWorld,
+} from './player.ts'
 import { mulberry32 } from './rng.ts'
-import { spiritFrame } from './spirit.ts'
+import { frameShifts, playerFrame, type SpiritAnim } from './spirit.ts'
 import { makeCanvas, spriteCanvas } from './sprites.ts'
 import { Stage, type Layers, type StageFrame } from './stage.ts'
 import { drawTerrain } from './terrain.ts'
@@ -49,12 +60,15 @@ import {
   boundsToPx,
   growSegments,
   segmentBounds,
-  spiritPerch,
   type TreeShape,
 } from './treeShape.ts'
 
 export type Scene = {
   purchases?: readonly ShopPurchase[]
+  /** Item ids of the accessories the spirit wears. */
+  outfit?: readonly string[]
+  /** Ids of reflect logs: each buries a keepsake at the tip of its root. */
+  keepsakes?: readonly string[]
   segments: readonly Segment[]
   revealedRelics: readonly RelicId[]
   inscriptionCount: number
@@ -62,7 +76,6 @@ export type Scene = {
   lp: number
   /** One colour for all the wood (trunk, branches, roots), as '#rrggbb'. */
   barkColor: string
-  paintMode: boolean
   reducedMotion: boolean
   spiritEnabled: boolean
 }
@@ -78,7 +91,6 @@ const EMPTY_SCENE: Scene = {
   inscriptionCount: 0,
   lp: 0,
   barkColor: NATURAL_BARK,
-  paintMode: false,
   reducedMotion: false,
   spiritEnabled: true,
 }
@@ -94,9 +106,27 @@ const PULSE_MS = 1200
 const CLICK_SLOP = 5
 const WHEEL_STEP = 60
 const KEY_PAN = 48
+const SPOTLIGHT_MS = 2600
+/** How quickly the camera catches up with the player (per second). */
+const FOLLOW_RATE = 6
+/** The camera looks at the player's body, this far above the feet. */
+const FOLLOW_ABOVE = 20
 const FIT_MARGIN = 1.5
 const ROOT_AMBER: Rgb = [1, 0.69, 0.36]
 const GOLD: Rgb = [1, 0.84, 0.48]
+
+/** Arrow keys and WASD move the player; with the spirit turned off, arrows pan instead. */
+const MOVE_KEYS: Record<string, keyof PlayerInput> = {
+  arrowleft: 'left',
+  a: 'left',
+  arrowright: 'right',
+  d: 'right',
+  arrowup: 'up',
+  w: 'up',
+  arrowdown: 'down',
+  s: 'down',
+  ' ': 'jump',
+}
 
 const PAN_KEYS: Record<string, [number, number]> = {
   arrowleft: [-1, 0],
@@ -106,8 +136,8 @@ const PAN_KEYS: Record<string, [number, number]> = {
 }
 
 /**
- * Owns the canvas: input, camera, the spirit in the canopy, and turning the
- * scene into layers for the three.js stage (or plain 2D without WebGL).
+ * Owns the canvas: input, camera, the spirit the player walks and climbs with,
+ * and turning the scene into layers for the three.js stage (or plain 2D without WebGL).
  */
 export class WorldRenderer {
   events: WorldEvents = {}
@@ -139,9 +169,26 @@ export class WorldRenderer {
   private readonly decorations = new TreeDecorations()
   private treeDirty = true
   private overlayDirty = true
+  /** Where each reflection's keepsake is buried: its log id and the tip of its root, in tiles. */
+  private keepsakes: { id: string; at: Point }[] = []
+  /** Leaves or a keepsake picked from the journal or relics: outlined for a while. */
+  private spotlight: { target: CanvasSelection; until: number } | null = null
 
-  /** Where the spirit sits (sprite centre, world pixels): off the top of the highest leaves. */
-  private spirit: Point = tileToPx(spiritPerch([], 0))
+  /** The spirit, walked and climbed by the player, and what it can stand on and climb. */
+  private player: Player | null = null
+  private playerWorld: PlayerWorld = buildPlayerWorld([], analyzeTree([], 0), 0, [])
+  private readonly held = new Set<keyof PlayerInput>()
+  /** Keys pressed since the last step, so a tap shorter than a frame still counts. */
+  private readonly tapped = new Set<keyof PlayerInput>()
+  /** The camera follows the player once it moves, until the view is dragged or eased elsewhere. */
+  private follow = false
+  private lastMs = 0
+  /** The spirit's frame with its outfit, redrawn when the frame or the outfit changes. */
+  private readonly dressed = makeCanvas(DRESS.w, DRESS.h)
+  private dressedKey = ''
+  private readonly outfit = new SpiritOutfit()
+  private outfitLoads = 0
+  private shifts: Partial<Record<SpiritAnim, Point[]>> = {}
   private happyUntil = 0
   private sparkleUntil = 0
   private tint: { color: Rgb; start: number } | null = null
@@ -179,7 +226,9 @@ export class WorldRenderer {
         this.kit = kit
         this.sheet = sheet
         this.npcImages = npcs
+        this.shifts = sheetShifts(sheet)
         this.stage?.setSpiritSheet(sheet)
+        this.stage?.setSpiritCanvas(this.dressed.canvas)
         this.stage?.setNpcSheets(npcs)
         this.treeDirty = true
         this.overlayDirty = true
@@ -193,6 +242,9 @@ export class WorldRenderer {
     canvas.addEventListener('pointerleave', this.onPointerLeave)
     canvas.addEventListener('wheel', this.onWheel, { passive: false })
     canvas.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keydown', this.onMoveKey)
+    window.addEventListener('keyup', this.onMoveKeyUp)
+    window.addEventListener('blur', this.onBlur)
     this.observer = new ResizeObserver(() => this.resize())
     this.observer.observe(canvas)
     this.resize()
@@ -211,6 +263,9 @@ export class WorldRenderer {
     c.removeEventListener('pointerleave', this.onPointerLeave)
     c.removeEventListener('wheel', this.onWheel)
     c.removeEventListener('keydown', this.onKeyDown)
+    window.removeEventListener('keydown', this.onMoveKey)
+    window.removeEventListener('keyup', this.onMoveKeyUp)
+    window.removeEventListener('blur', this.onBlur)
     this.stage?.dispose()
     this.events = {}
   }
@@ -237,14 +292,23 @@ export class WorldRenderer {
     }
     if (segmentsChanged || next.lp !== prev.lp) {
       this.shape = analyzeTree(next.segments, next.lp)
-      this.spirit = tileToPx(spiritPerch(next.segments, next.lp))
       this.syncHouses(this.started && !this.needsFit)
+      this.playerWorld = buildPlayerWorld(next.segments, this.shape, next.lp, this.houses)
       this.treeDirty = true
     }
+    this.player ??= spawnPlayer(this.playerWorld)
+    if (segmentsChanged || JSON.stringify(next.keepsakes) !== JSON.stringify(prev.keepsakes)) {
+      const roots = new Map(next.segments.filter((s) => s.kind === 'root').map((s) => [s.id, s.to]))
+      this.keepsakes = (next.keepsakes ?? []).flatMap((id) => {
+        const at = roots.get(`${id}:r`)
+        return at ? [{ id, at }] : []
+      })
+    }
+    if (JSON.stringify(next.outfit) !== JSON.stringify(prev.outfit)) this.dressedKey = ''
     if (JSON.stringify(next.purchases) !== JSON.stringify(prev.purchases)) this.treeDirty = true
     if (next.barkColor !== prev.barkColor) this.treeDirty = true
     if (!this.growth) this.revealRelics(this.started)
-    if (!next.paintMode && this.hover?.kind === 'segment') this.hover = null
+    if (!next.spiritEnabled) this.onBlur()
     this.overlayDirty = true
     this.started = true
     if (this.needsFit && this.view.width > 0) this.fit(false)
@@ -260,6 +324,30 @@ export class WorldRenderer {
 
   fitTree(): void {
     this.fit(true)
+  }
+
+  /** Eases the camera to a branch's leaves and outlines them for a moment (a journal entry was picked). */
+  focusBranch(id: string): void {
+    const seg = this.scene.segments.find((s) => s.id === id && s.kind === 'branch')
+    if (!seg) return
+    this.spotlightOn({ kind: 'segment', id }, seg.to, rgb01(leafShades(seg.leafColor ?? 'base').mid))
+    this.focusOn([seg])
+  }
+
+  /** Eases the camera to a reflection's keepsake in the roots and outlines it for a moment. */
+  focusKeepsake(logId: string): void {
+    const k = this.keepsakes.find((k) => k.id === logId)
+    if (!k || this.view.width === 0) return
+    this.spotlightOn({ kind: 'reflection', id: logId }, k.at, rgb01(LEAF.reflect.light))
+    const r = { left: k.at.x - 2, right: k.at.x + 2, top: k.at.y - 2, bottom: k.at.y + 2 }
+    this.moveTo(fitRect(boundsToPx(r, FIT_MARGIN), this.view, this.cam.zoom))
+  }
+
+  private spotlightOn(target: CanvasSelection, at: Point, color: Rgb) {
+    const now = performance.now()
+    this.spotlight = { target, until: now + SPOTLIGHT_MS }
+    this.overlayDirty = true
+    if (!this.scene.reducedMotion) this.pulse = { at: tileToPx(at), start: now, color }
   }
 
   // --- growth and reveals ---------------------------------------------------
@@ -390,6 +478,7 @@ export class WorldRenderer {
   }
 
   private moveTo(target: Camera) {
+    this.follow = false
     if (this.scene.reducedMotion) {
       this.cam = target
       this.tween = null
@@ -419,7 +508,19 @@ export class WorldRenderer {
 
   private frame = (ms: number) => {
     this.raf = requestAnimationFrame(this.frame)
+    const dt = Math.min(0.05, Math.max(0, (ms - this.lastMs) / 1000))
+    this.lastMs = ms
     if (this.view.width === 0 || !this.started) return
+
+    if (this.player && this.scene.spiritEnabled) {
+      this.player = stepPlayer(this.player, this.input(), this.playerWorld, dt)
+      this.tapped.clear()
+      if (this.follow) this.followPlayer(dt)
+    }
+    if (this.spotlight && ms > this.spotlight.until) {
+      this.spotlight = null
+      this.overlayDirty = true
+    }
 
     if (this.tween) {
       const t = Math.min(1, (ms - this.tween.start) / EASE_MS)
@@ -494,30 +595,39 @@ export class WorldRenderer {
   }
 
   private overlayState(): OverlayState {
-    const h = this.hover
+    const h = this.hover ?? this.spotlight?.target
     let hover: OverlayState['hover'] = null
     if (h?.kind === 'tablet') hover = 'tablet'
     else if (h?.kind === 'relic') {
       const p = tileToPx(RELIC_TILES[h.id])
       hover = { canvas: spriteCanvas(RELIC_SPRITES[h.id]), x: p.x - 8, y: p.y - 8 }
+    } else if (h?.kind === 'reflection') {
+      const k = this.keepsakes.find((k) => k.id === h.id)
+      const p = k && tileToPx(k.at)
+      if (p) hover = { canvas: spriteCanvas('keepsake'), x: p.x - 8, y: p.y - 8 }
     } else if (h?.kind === 'segment' && this.kit) {
       const seg = this.scene.segments.find((s) => s.id === h.id)
       if (seg) hover = clusterAt(this.kit, seg, this.scene.lp)
     }
-    return { relics: this.relicsShown, ruinLit: this.ruinLit(), inscriptions: this.scene.inscriptionCount, hover }
+    return {
+      relics: this.relicsShown,
+      ruinLit: this.ruinLit(),
+      inscriptions: this.scene.inscriptionCount,
+      keepsakes: this.keepsakes.map((k) => k.at),
+      hover,
+    }
   }
 
   private renderStage(ms: number) {
     const time = ms / 1000
     let spirit = null
-    if (this.scene.spiritEnabled) {
-      const { anim, frame } = spiritFrame(time, ms < this.happyUntil, this.scene.reducedMotion)
+    const p = this.player
+    if (this.scene.spiritEnabled && p) {
+      const { flip } = this.dressSpirit(ms)
       const tp = this.tint ? (ms - this.tint.start) / TINT_MS : 1
       spirit = {
-        pos: this.spirit,
-        anim,
-        frame,
-        flip: false,
+        feet: { x: p.x, y: p.y },
+        flip,
         tint: this.tint?.color ?? GOLD,
         tintAmount: tp < 1 ? (tp < 0.6 ? 1 : 1 - (tp - 0.6) / 0.4) : 0,
         sweep: Math.min(1, tp * 1.8),
@@ -561,11 +671,51 @@ export class WorldRenderer {
       const { w, h } = NPCS[a.npc].cell
       if (img) drawCell(ctx, img, a.frame * w, a.row * h, w, h, Math.round(a.x - w / 2), a.feetY - h + 1, a.flip)
     }
-    if (!this.sheet || !this.scene.spiritEnabled) return
-    const { anim, frame } = spiritFrame(ms / 1000, ms < this.happyUntil, this.scene.reducedMotion)
-    const { w, h } = SPIRIT_CELL
-    const s = this.spirit
-    drawCell(ctx, this.sheet, frame * w, SPIRIT_ANIMS[anim].row * h, w, h, Math.round(s.x - w / 2), Math.round(s.y - h / 2), false)
+    const p = this.player
+    if (!this.sheet || !this.scene.spiritEnabled || !p) return
+    const { flip } = this.dressSpirit(ms)
+    const left = Math.round(p.x - SPIRIT_CELL.w / 2) - DRESS.cellX
+    const top = Math.round(p.y) - SPIRIT_CELL.h - DRESS.cellY
+    drawCell(ctx, this.dressed.canvas, 0, 0, DRESS.w, DRESS.h, left, top, flip)
+  }
+
+  /**
+   * Draws the player's frame and what it wears into the dressed canvas, when
+   * either changed. Worn things move with the frame's body (sheetShifts).
+   */
+  private dressSpirit(ms: number): { flip: boolean } {
+    const { anim, frame, flip } = playerFrame(this.player!, ms / 1000, ms < this.happyUntil, this.scene.reducedMotion)
+    const outfit = this.scene.outfit ?? []
+    const key = `${anim}:${frame}:${outfit.join(',')}:${this.outfitLoads}`
+    if (key !== this.dressedKey && this.sheet) {
+      this.dressedKey = key
+      const ctx = this.dressed.ctx
+      const pose = anim === 'idle' ? 'front' : 'side'
+      const shift = this.shifts[anim]?.[frame] ?? { x: 0, y: 0 }
+      const loaded = () => {
+        if (!this.disposed) this.outfitLoads++
+      }
+      const { w, h } = SPIRIT_CELL
+      ctx.clearRect(0, 0, DRESS.w, DRESS.h)
+      this.outfit.draw(ctx, outfit, pose, 'behind', shift, loaded)
+      ctx.drawImage(this.sheet, frame * w, SPIRIT_ANIMS[anim].row * h, w, h, DRESS.cellX, DRESS.cellY, w, h)
+      this.outfit.draw(ctx, outfit, pose, 'front', shift, loaded)
+      this.stage?.markSpiritDirty()
+    }
+    return { flip }
+  }
+
+  private followPlayer(dt: number) {
+    const p = this.player!
+    const k = this.scene.reducedMotion ? 1 : 1 - Math.exp(-dt * FOLLOW_RATE)
+    const cy = p.y - FOLLOW_ABOVE
+    this.cam = clampCamera({ zoom: this.cam.zoom, cx: this.cam.cx + (p.x - this.cam.cx) * k, cy: this.cam.cy + (cy - this.cam.cy) * k }, this.view)
+  }
+
+  private input(): PlayerInput {
+    if (this.held.size === 0 && this.tapped.size === 0) return NO_INPUT
+    const on = (k: keyof PlayerInput) => this.held.has(k) || this.tapped.has(k)
+    return { left: on('left'), right: on('right'), up: on('up'), down: on('down'), jump: on('jump') }
   }
 
   // --- input ----------------------------------------------------------------
@@ -576,6 +726,7 @@ export class WorldRenderer {
       revealedRelics: this.relicsShown,
       ruinLit: this.ruinLit(),
       lp: this.scene.lp,
+      keepsakes: this.keepsakes,
     }
   }
 
@@ -588,8 +739,8 @@ export class WorldRenderer {
     return hitTest(this.hitScene(), pxToTile(screenToWorld(this.cam, this.view, p)))
   }
 
-  private setHover(target: CanvasSelection | null) {
-    const next = target?.kind === 'segment' && !this.scene.paintMode ? null : target
+  /** Everything clickable highlights: leaves open their journal entry, or take paint or a trinket. */
+  private setHover(next: CanvasSelection | null) {
     if (JSON.stringify(next) !== JSON.stringify(this.hover)) {
       this.hover = next
       this.overlayDirty = true
@@ -613,6 +764,7 @@ export class WorldRenderer {
       const [a, b] = [...this.pointers.values()]
       this.pinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: this.cam.zoom, mid: midpoint(a, b) }
       this.drag = null
+      this.follow = false
     }
   }
 
@@ -633,6 +785,7 @@ export class WorldRenderer {
     } else if (this.drag) {
       if (!this.drag.moved && Math.hypot(p.x - this.drag.start.x, p.y - this.drag.start.y) > CLICK_SLOP) {
         this.drag.moved = true
+        this.follow = false
         this.updateCursor()
       }
       if (this.drag.moved) this.cam = panBy(this.cam, this.view, p.x - this.drag.last.x, p.y - this.drag.last.y)
@@ -679,7 +832,10 @@ export class WorldRenderer {
   private onKeyDown = (e: KeyboardEvent) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return
     const key = e.key.toLowerCase()
-    if (PAN_KEYS[key]) this.panKey(key)
+    if (PAN_KEYS[key]) {
+      if (this.playing()) return // onMoveKey walks the player instead
+      this.panKey(key)
+    }
     else if (key === '+' || key === '=') this.zoomBy(1)
     else if (key === '-' || key === '_') this.zoomBy(-1)
     else if (key === 'f' || key === '0') this.fit(true)
@@ -687,11 +843,66 @@ export class WorldRenderer {
     e.preventDefault()
   }
 
+  private playing(): boolean {
+    return this.scene.spiritEnabled && this.player !== null
+  }
+
+  /**
+   * Movement keys work wherever focus is, except while typing, and Space still
+   * presses a focused button. E reads the journal entry of the leaves the spirit is at.
+   */
+  private onMoveKey = (e: KeyboardEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || !this.playing() || typingIn(e.target)) return
+    const key = e.key.toLowerCase()
+    const move = MOVE_KEYS[key]
+    if (move) {
+      if (move === 'jump' && pressable(e.target)) return
+      this.held.add(move)
+      this.tapped.add(move)
+      this.follow = true
+      this.tween = null
+    } else if (key === 'e') {
+      if (e.repeat) return
+      const id = bunchAt(this.scene.segments, this.scene.lp, this.player!)
+      if (id) this.events.onSelect?.({ kind: 'segment', id })
+    } else return
+    e.preventDefault()
+  }
+
+  private onMoveKeyUp = (e: KeyboardEvent) => {
+    const move = MOVE_KEYS[e.key.toLowerCase()]
+    if (move) this.held.delete(move)
+  }
+
+  private onBlur = () => {
+    this.held.clear()
+    this.tapped.clear()
+  }
+
   private panKey(key: string) {
     const [x, y] = PAN_KEYS[key]
     this.tween = null
     this.cam = panBy(this.cam, this.view, -x * KEY_PAN, -y * KEY_PAN)
   }
+}
+
+/** Per frame, how far the body moved from the row's first frame, for the rows the player shows. */
+function sheetShifts(sheet: HTMLImageElement): Partial<Record<SpiritAnim, Point[]>> {
+  const { canvas, ctx } = makeCanvas(sheet.naturalWidth, sheet.naturalHeight)
+  ctx.drawImage(sheet, 0, 0)
+  const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+  const alpha = new Uint8Array(rgba.length / 4)
+  for (let i = 0; i < alpha.length; i++) alpha[i] = rgba[i * 4 + 3]
+  const row = (anim: SpiritAnim) => frameShifts(alpha, canvas.width, SPIRIT_CELL, SPIRIT_ANIMS[anim].row, SPIRIT_ANIMS[anim].frames)
+  return { idle: row('idle'), walk: row('walk') }
+}
+
+function typingIn(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+}
+
+function pressable(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && /^(BUTTON|A|SUMMARY)$/.test(target.tagName)
 }
 
 async function loadNpcSheets(): Promise<Record<NpcId, HTMLImageElement>> {
@@ -708,7 +919,7 @@ function segmentsKey(segments: readonly Segment[]): string {
 /** One sheet cell at (x, y), mirrored when `flip` (sheets face right). */
 function drawCell(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: CanvasImageSource,
   sx: number,
   sy: number,
   w: number,

@@ -8,19 +8,25 @@ export type HitScene = {
   ruinLit: boolean
   /** Total LP: leaf clusters, and so their click area, grow with it. */
   lp: number
+  /** Each reflection's keepsake: its log id and where it is buried, in tiles. */
+  keepsakes?: readonly { id: string; at: Point }[]
 }
 
 const RELIC_REACH = 0.7
+const KEEPSAKE_REACH = 0.55
 const TABLET_REACH = 0.5
 const LEAF_REACH = 0.25
 const LINE_REACH = 0.6
 
-/** Point in tile coordinates -> relic, tablet, then the nearest branch segment: what onSelect gets. */
+/** Point in tile coordinates -> relic, keepsake, tablet, then the nearest branch segment: what onSelect gets. */
 export function hitTest(scene: HitScene, p: Point): CanvasSelection | null {
-
   for (const relicId of scene.revealedRelics) {
     const t = RELIC_TILES[relicId]
     if (Math.abs(p.x - t.x) <= RELIC_REACH && Math.abs(p.y - t.y) <= RELIC_REACH) return { kind: 'relic', id: relicId }
+  }
+
+  for (const k of scene.keepsakes ?? []) {
+    if (Math.abs(p.x - k.at.x) <= KEEPSAKE_REACH && Math.abs(p.y - k.at.y) <= KEEPSAKE_REACH) return { kind: 'reflection', id: k.id }
   }
 
   if (

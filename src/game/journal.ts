@@ -7,9 +7,12 @@ export type JournalPage = { date: string; entries: SelfCareLog[]; continued: boo
 const PAGE_LINES = 11;
 const LINE_CHARS = 26;
 
-/** A record's title line, plus its reflection (in quotes) and mood if it has them. */
+/** Lines a row of photo thumbnails takes. */
+const PHOTO_LINES = 3;
+
+/** A record's title line, plus its reflection (in quotes), mood and photos if it has them. */
 function linesOf(log: SelfCareLog): number {
-  return 1 + (log.text ? Math.ceil((log.text.length + 2) / LINE_CHARS) : 0) + (log.mood ? 1 : 0);
+  return 1 + (log.text ? Math.ceil((log.text.length + 2) / LINE_CHARS) : 0) + (log.mood ? 1 : 0) + (log.images?.length ? PHOTO_LINES : 0);
 }
 
 /**

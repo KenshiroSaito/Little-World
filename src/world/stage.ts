@@ -4,6 +4,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { DRESS } from '../shop/outfit'
 import { SPIRIT_ANIMS, SPIRIT_CELL } from './artLayout.ts'
 import { deviceOffset, deviceScale, worldToScreen, type Camera, type View } from './camera.ts'
 import { WORLD_COLS, WORLD_H, WORLD_ROWS, WORLD_W, type Point } from './layout.ts'
@@ -11,7 +12,6 @@ import { NPCS, type NpcId } from './npcs.ts'
 import { BACKDROP } from './palette.ts'
 import { Particles, type Rgb } from './particles.ts'
 import { COMPOSITE_FRAG, DARKNESS_FRAG, QUAD_VERT, SPIRIT_FRAG } from './shaders.ts'
-import type { SpiritAnim } from './spirit.ts'
 
 /** 2D canvases the stage shows: world-sized, except light (one pixel per tile). */
 export type Layers = Record<'terrain' | 'tree' | 'overlay' | 'glow' | 'light', HTMLCanvasElement>
@@ -22,10 +22,10 @@ export type StageFrame = {
   view: View
   /** Seconds. */
   time: number
+  /** The player: its dressed frame is the canvas given to setSpiritCanvas. */
   spirit: {
-    pos: Point
-    anim: SpiritAnim
-    frame: number
+    /** Where the feet stand, in world pixels. */
+    feet: Point
     flip: boolean
     /** Colour-transition sweep: tint colour, 0 to 1 strength, 0 to 1 height. */
     tint: Rgb
@@ -71,6 +71,7 @@ export class Stage {
   private readonly finalComposer: EffectComposer
   private readonly composite: ShaderPass
   private sheet: THREE.Texture | null = null
+  private dressed: THREE.CanvasTexture | null = null
   private readonly npcMeshes: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = []
   private npcSheets: Partial<Record<NpcId, THREE.Texture>> = {}
 
@@ -126,14 +127,14 @@ export class Stage {
     this.particles.glow.renderOrder = 1
     this.glowScene.add(this.particles.glow)
 
-    // Spirit and its sparkle, each once crisp in the scene and once as light in the glow scene.
-    for (const [scene, emissive, order] of [
-      [this.main, 0, 5],
-      [this.main, 0, 6],
-      [this.glowScene, 1, 2],
-      [this.glowScene, 1, 3],
+    // The dressed spirit and its sparkle, each once crisp in the scene and once as light in the glow scene.
+    for (const [scene, emissive, order, w, h] of [
+      [this.main, 0, 5, DRESS.w, DRESS.h],
+      [this.main, 0, 6, SPIRIT_CELL.w, SPIRIT_CELL.h],
+      [this.glowScene, 1, 2, DRESS.w, DRESS.h],
+      [this.glowScene, 1, 3, SPIRIT_CELL.w, SPIRIT_CELL.h],
     ] as const) {
-      const mesh = spriteMesh(SPIRIT_CELL.w, SPIRIT_CELL.h, emissive, order)
+      const mesh = spriteMesh(w, h, emissive, order)
       scene.add(mesh)
       this.sprites.push(mesh)
     }
@@ -176,10 +177,32 @@ export class Stage {
     this.finalComposer.addPass(new OutputPass())
   }
 
+  /** The sheet, for the sparkle frame. */
   setSpiritSheet(image: HTMLImageElement): void {
     const t = sheetTexture(image)
     this.sheet = t
-    for (const m of this.sprites) m.material.uniforms.tSheet.value = t
+    const [, sparkle, , sparkleGlow] = this.sprites
+    for (const m of [sparkle, sparkleGlow]) m.material.uniforms.tSheet.value = t
+  }
+
+  /** The DRESS-sized canvas the renderer draws the spirit's frame and outfit into. */
+  setSpiritCanvas(canvas: HTMLCanvasElement): void {
+    const t = new THREE.CanvasTexture(canvas)
+    t.magFilter = THREE.NearestFilter
+    t.minFilter = THREE.NearestFilter
+    t.generateMipmaps = false
+    t.colorSpace = THREE.SRGBColorSpace
+    this.dressed = t
+    const [main, , glow] = this.sprites
+    for (const m of [main, glow]) {
+      m.material.uniforms.tSheet.value = t
+      m.material.uniforms.uFrame.value.set(0, 0, 1, 1)
+    }
+  }
+
+  /** Call after redrawing the spirit canvas. */
+  markSpiritDirty(): void {
+    if (this.dressed) this.dressed.needsUpdate = true
   }
 
   setNpcSheets(images: Record<NpcId, HTMLImageElement>): void {
@@ -250,6 +273,7 @@ export class Stage {
     this.leaves.dispose()
     for (const t of Object.values(this.textures)) t.dispose()
     this.sheet?.dispose()
+    this.dressed?.dispose()
     for (const t of Object.values(this.npcSheets)) t.dispose()
     this.main.traverse(disposeMesh)
     this.glowScene.traverse(disposeMesh)
@@ -278,34 +302,36 @@ export class Stage {
 
   private updateSpirit(f: StageFrame) {
     const s = f.spirit
-    const visible = s !== null && this.sheet !== null
+    const visible = s !== null && this.sheet !== null && this.dressed !== null
     const [main, sparkle, glow, sparkleGlow] = this.sprites
     main.visible = glow.visible = visible
     sparkle.visible = sparkleGlow.visible = visible && s.sparkle
-    this.darkness.uniforms.uSpirit.value.set(visible ? s.pos.x : -1e4, visible ? s.pos.y : -1e4)
+    // The light it carries underground is centred on its body.
+    this.darkness.uniforms.uSpirit.value.set(visible ? s.feet.x : -1e4, visible ? s.feet.y - SPIRIT_CELL.h / 2 : -1e4)
     if (!visible) return
 
     const image = this.sheet!.image as HTMLImageElement
     const fw = SPIRIT_CELL.w / image.width
     const fh = SPIRIT_CELL.h / image.height
-    const frameUv = (anim: SpiritAnim, frame: number) =>
-      new THREE.Vector4(frame * fw, 1 - (SPIRIT_ANIMS[anim].row + 1) * fh, fw, fh)
-    const x = Math.round(s.pos.x - SPIRIT_CELL.w / 2) + SPIRIT_CELL.w / 2
-    const y = Math.round(s.pos.y - SPIRIT_CELL.h / 2) + SPIRIT_CELL.h / 2
-    for (const [mesh, anim, frame] of [
-      [main, s.anim, s.frame],
-      [glow, s.anim, s.frame],
-      [sparkle, 'sparkle', 0],
-      [sparkleGlow, 'sparkle', 0],
-    ] as const) {
+    // The sheet cell, feet on its bottom row, and the DRESS canvas around it.
+    const cellLeft = Math.round(s.feet.x - SPIRIT_CELL.w / 2)
+    const cellTop = Math.round(s.feet.y) - SPIRIT_CELL.h
+    for (const mesh of [main, glow]) {
       const uni = mesh.material.uniforms
-      uni.uFrame.value = frameUv(anim, frame)
       uni.uFlip.value = s.flip ? 1 : 0
       uni.uTint.value.set(...s.tint)
-      uni.uTintAmount.value = anim === 'sparkle' ? 0 : s.tintAmount
+      uni.uTintAmount.value = s.tintAmount
       uni.uSweep.value = s.sweep
-      uni.uGlow.value = anim === 'sparkle' ? 1 : s.glow
-      mesh.position.set(x, -y, 0)
+      uni.uGlow.value = s.glow
+      mesh.position.set(cellLeft - DRESS.cellX + DRESS.w / 2, -(cellTop - DRESS.cellY + DRESS.h / 2), 0)
+    }
+    for (const mesh of [sparkle, sparkleGlow]) {
+      const uni = mesh.material.uniforms
+      uni.uFrame.value.set(0, 1 - (SPIRIT_ANIMS.sparkle.row + 1) * fh, fw, fh)
+      uni.uFlip.value = 0
+      uni.uTintAmount.value = 0
+      uni.uGlow.value = 1
+      mesh.position.set(cellLeft + SPIRIT_CELL.w / 2, -(cellTop + SPIRIT_CELL.h / 2), 0)
     }
   }
 }

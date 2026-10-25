@@ -10,13 +10,22 @@ export type TreeCanvasHandle = {
   zoomIn(): void
   zoomOut(): void
   fitTree(): void
+  /** Eases to a branch's leaves and outlines them for a moment. */
+  focusBranch(segmentId: string): void
+  /** Eases to a reflection's keepsake in the roots and outlines it for a moment. */
+  focusKeepsake(logId: string): void
 }
 
 export type TreeCanvasProps = {
-  /** Clicks on a branch segment, a relic or the tablets. */
+  /** Clicks on a branch segment, a relic, a reflection's keepsake or the tablets; E at a leaf bunch too. */
   onSelect: (selection: CanvasSelection) => void
-  /** buildTree output; the bare sapling until B's state is wired in. Compared by content. */
+  /** Trinkets, hung on the branches they were placed on. */
   purchases?: readonly ShopPurchase[]
+  /** Item ids of the accessories the spirit wears. */
+  outfit?: readonly string[]
+  /** Ids of reflect logs; each buries a keepsake at the tip of its root. */
+  keepsakes?: readonly string[]
+  /** buildTree output; the bare sapling until B's state is wired in. Compared by content. */
   segments?: readonly Segment[]
   /** revealedRelics(state) ids. The ruin lights up once heartwood_relic is in here. */
   revealedRelics?: readonly RelicId[]
@@ -26,10 +35,8 @@ export type TreeCanvasProps = {
   lp?: number
   /** One colour for all the wood (trunk, branches, roots), as '#rrggbb'; the kit's natural bark if left out. */
   barkColor?: string
-  /** Highlights leaf clusters on hover. */
-  paintMode?: boolean
   reducedMotion?: boolean
-  /** The tree spirit, sitting in the canopy. */
+  /** The tree spirit, which the player walks, jumps and climbs with. */
   spiritEnabled?: boolean
   className?: string
   ref?: Ref<TreeCanvasHandle>
@@ -41,11 +48,12 @@ export default function TreeCanvas({
   onSelect,
   segments = NONE,
   purchases = NONE,
+  outfit = NONE,
+  keepsakes = NONE,
   revealedRelics = NONE,
   inscriptionCount = 0,
   lp = 0,
   barkColor = NATURAL_BARK,
-  paintMode = false,
   reducedMotion = false,
   spiritEnabled = true,
   className,
@@ -67,15 +75,16 @@ export default function TreeCanvas({
     rendererRef.current?.setScene({
       segments,
       purchases,
+      outfit,
+      keepsakes,
       revealedRelics,
       inscriptionCount,
       lp,
       barkColor,
-      paintMode,
       reducedMotion,
       spiritEnabled,
     })
-  }, [purchases, segments, revealedRelics, inscriptionCount, lp, barkColor, paintMode, reducedMotion, spiritEnabled])
+  }, [purchases, outfit, keepsakes, segments, revealedRelics, inscriptionCount, lp, barkColor, reducedMotion, spiritEnabled])
 
   useEffect(() => {
     if (rendererRef.current) rendererRef.current.events = { onSelect }
@@ -87,6 +96,8 @@ export default function TreeCanvas({
       zoomIn: () => rendererRef.current?.zoomIn(),
       zoomOut: () => rendererRef.current?.zoomOut(),
       fitTree: () => rendererRef.current?.fitTree(),
+      focusBranch: (segmentId: string) => rendererRef.current?.focusBranch(segmentId),
+      focusKeepsake: (logId: string) => rendererRef.current?.focusKeepsake(logId),
     }),
     [],
   )
@@ -98,7 +109,7 @@ export default function TreeCanvas({
       tabIndex={0}
       role="application"
       aria-roledescription="tree view"
-      aria-label="Your tree. Drag or use the arrow keys to look around, plus and minus to zoom, F to fit the tree."
+      aria-label="Your tree and its spirit. Arrow keys or WASD walk, Space jumps, Up and Down climb the trunk, branches and roots, E reads the journal entry of the leaves you are at. Drag to look around, plus and minus to zoom, F to fit the tree."
       style={{ display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated', touchAction: 'none' }}
     />
   )

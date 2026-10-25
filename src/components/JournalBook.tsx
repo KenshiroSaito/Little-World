@@ -3,11 +3,22 @@ import { ACTIVITIES } from "../game/activities";
 import { journalPages } from "../game/journal";
 import { MOODS } from "../game/moods";
 import { useGame } from "../state/GameProvider";
-import type { ActivityId, MoodTag } from "../types";
-import { LEAF } from "../world";
+import {
+  isCustomColor,
+  type ActivityId,
+  type LeafColor,
+  type MoodTag,
+  type SelfCareLog,
+} from "../types";
+import { leafShades } from "../world";
+import ReflectionImages from "./ReflectionImages";
 
 type Props = {
   onClose: () => void;
+  /** Open on the page with this record and mark it (its leaves were clicked). */
+  focusLogId?: string | null;
+  /** Close the book and show a record's leaves on the tree. */
+  onShowOnTree: (logId: string) => void;
 };
 
 const LABELS = Object.fromEntries(
@@ -29,6 +40,22 @@ const formatTime = (iso: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
+
+/**
+ * A record's leaves as they are on the tree: painted with a preset or a mixed
+ * colour, or the activity's own colour.
+ */
+function leafOf(
+  log: SelfCareLog,
+  paint: Readonly<Record<string, LeafColor>>,
+): { color: string; label: string } {
+  const painted = paint[`${log.id}:b`];
+  const color = leafShades(painted ?? log.activityId).mid;
+  if (!painted) return { color, label: "" };
+  if (isCustomColor(painted)) return { color, label: `, leaves mixed ${painted}` };
+  const name = painted === "base" ? "base green" : LABELS[painted].toLowerCase();
+  return { color, label: `, leaves painted ${name}` };
+}
 
 /** A pixel page-turn arrow, pointing right unless `back`. */
 function Arrow({ back }: { back?: boolean }) {
@@ -67,13 +94,21 @@ function Arrow({ back }: { back?: boolean }) {
 
 /**
  * The self-care journal as a Minecraft-style book: one page at a time, opened
- * on the newest, turned with the arrows or the arrow keys.
+ * on the newest (or on the record whose leaves were clicked), turned with the
+ * arrows or the arrow keys. Each record links back to its leaves on the tree.
  */
-export default function JournalBook({ onClose }: Props) {
+export default function JournalBook({
+  onClose,
+  focusLogId,
+  onShowOnTree,
+}: Props) {
   const { state } = useGame();
   const pages = journalPages(state.selfCareLogs);
   const last = Math.max(0, pages.length - 1);
-  const [page, setPage] = useState(last);
+  const focusPage = pages.findIndex((p) =>
+    p.entries.some((log) => log.id === focusLogId),
+  );
+  const [page, setPage] = useState(focusPage >= 0 ? focusPage : last);
   const current = Math.min(page, last);
   const shown = pages[current];
 
@@ -113,25 +148,44 @@ export default function JournalBook({ onClose }: Props) {
                   {shown.continued && " (cont.)"}
                 </h2>
                 <ul className="book-entries">
-                  {shown.entries.map((log) => (
-                    <li key={log.id}>
-                      <span
-                        className="book-leaf"
-                        style={{ background: LEAF[log.activityId].mid }}
-                        aria-hidden="true"
-                      />
-                      {LABELS[log.activityId]}{" "}
-                      <span className="book-time">
-                        {formatTime(log.createdAt)}
-                      </span>
-                      {log.text && <p className="book-text">“{log.text}”</p>}
-                      {log.mood && (
-                        <p className="book-mood">
-                          Feeling {MOOD_LABELS[log.mood].toLowerCase()}
-                        </p>
-                      )}
-                    </li>
-                  ))}
+                  {shown.entries.map((log) => {
+                    const leaf = leafOf(log, state.leafPaint);
+                    return (
+                      <li
+                        key={log.id}
+                        className={
+                          log.id === focusLogId ? "book-entry-focus" : undefined
+                        }
+                      >
+                        <button
+                          className="book-entry-link"
+                          title="Show its leaves on the tree"
+                          aria-label={`${LABELS[log.activityId]} at ${formatTime(log.createdAt)}${leaf.label}. Show its leaves on the tree.`}
+                          onClick={() => onShowOnTree(log.id)}
+                        >
+                          <span
+                            className="book-leaf"
+                            style={{ background: leaf.color }}
+                            aria-hidden="true"
+                          />
+                          {LABELS[log.activityId]}{" "}
+                          <span className="book-time">
+                            {formatTime(log.createdAt)}
+                          </span>
+                        </button>
+                        {log.text && <p className="book-text">“{log.text}”</p>}
+                        {log.mood && (
+                          <p className="book-mood">
+                            Feeling {MOOD_LABELS[log.mood].toLowerCase()}
+                          </p>
+                        )}
+                        <ReflectionImages
+                          ids={log.images}
+                          className="book-photos"
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             ) : (

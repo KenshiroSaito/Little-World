@@ -39,7 +39,7 @@ export function ruinReached(state: GameState): boolean {
   return totalLP(state) >= RUIN_THRESHOLD;
 }
 
-/** Reflect records with a sentence or a mood, oldest first. Shown on the ruin's tablet wall. */
+/** Reflect records with a sentence, a mood or photos, oldest first. Shown on the ruin's tablet wall. */
 export function inscriptions(state: GameState): SelfCareLog[] {
-  return state.selfCareLogs.filter(log => log.activityId === 'reflect' && (log.text || log.mood));
+  return state.selfCareLogs.filter(log => log.activityId === 'reflect' && (log.text || log.mood || log.images?.length));
 }

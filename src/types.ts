@@ -33,6 +33,7 @@ export type SelfCareLog = {
   points: number; // 5
   text?: string; // reflect only, max 120 chars
   mood?: MoodTag; // reflect only
+  images?: string[]; // reflect only, ids of photos kept in IndexedDB (state/images.ts), at most 3
 };
 
 export type GameState = {
@@ -78,6 +79,7 @@ export type GameAction =
       now: string; // ISO timestamp, passed in so the reducer stays pure
       text?: string;
       mood?: MoodTag;
+      images?: string[];
     }
   | {
       type: "paint";
@@ -90,10 +92,15 @@ export type GameAction =
   | { type: "nextDay" } // demo mode only
   | { type: "buyItem"; itemId: string; id: string }
   | { type: "placeItem"; purchaseId: string; segmentId: string | null }
+  | { type: "wearItem"; purchaseId: string; worn: boolean }
+  /** Replace the photos kept with a reflection (add or remove them later, from Relics). */
+  | { type: "setImages"; logId: string; images: string[] }
   | { type: "reset" };
 
 /** A -> C: what the player clicked on the canvas. */
 export type CanvasSelection =
   | { kind: "segment"; id: string }
   | { kind: "relic"; id: RelicId }
+  /** The keepsake a reflection buried at its root's tip; id is the reflect log's id. */
+  | { kind: "reflection"; id: string }
   | { kind: "tablet" };

@@ -13,7 +13,7 @@ import { GROWN_LP } from './treeShape.ts'
 /** Every record is worth 5 LP, so one house per record once the tree is grown. */
 const LP_PER_HOUSE = 5
 /** Deck, hut, roof and strut sizes in world pixels: big enough for the characters who live there. */
-const DECK_W = 70
+export const DECK_W = 70
 const DECK_H = 5
 const HUT_W = 44
 const WALL_H = 30
