@@ -4,7 +4,7 @@ import { MOODS } from "../game/moods";
 import { MAX_REFLECTION_IMAGES, MAX_REFLECTION_LENGTH } from "../game/rules";
 import { useGame } from "../state/GameProvider";
 import { saveImage } from "../state/images";
-import type { ActivityId, MoodTag } from "../types";
+import type { MoodTag } from "../types";
 import ActivityIcon from "./ActivityIcon";
 import { PhotoPreview } from "./ReflectionImages";
 
@@ -21,10 +21,6 @@ export default function SelfCarePanel({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [photoError, setPhotoError] = useState(false);
 
-  function recordAndClose(activityId: ActivityId) {
-    record(activityId);
-    onClose();
-  }
 
   /** Photos are kept first, so the reflection is only recorded with photos that were really saved. */
   async function saveReflection() {
@@ -33,12 +29,16 @@ export default function SelfCarePanel({ onClose }: Props) {
     try {
       const images = await Promise.all(photos.map(saveImage));
       record("reflect", { text, mood: mood || undefined, images });
-      onClose();
+      // Stay open: clear the form and fold Reflect back into its card.
+      setText("");
+      setMood("");
+      setPhotos([]);
+      setReflectOpen(false);
     } catch (error) {
       console.warn("Unable to keep the reflection's photos", error);
       setPhotoError(true);
-      setSaving(false);
     }
+    setSaving(false);
   }
 
   const reflectForm = (
@@ -112,7 +112,7 @@ export default function SelfCarePanel({ onClose }: Props) {
                 {!open && (
                   <button
                     className="btn-primary activity-add"
-                    onClick={() => (a.id === "reflect" ? setReflectOpen(true) : recordAndClose(a.id))}
+                    onClick={() => (a.id === "reflect" ? setReflectOpen(true) : record(a.id))}
                     aria-label={`Record ${a.label}, plus 5 LP`}
                   >
                     +5 LP
