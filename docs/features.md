@@ -25,7 +25,7 @@ Code: [`SelfCarePanel.tsx`](../src/components/SelfCarePanel.tsx), [`activities.t
 
 ## Reflections and photos
 
-Choose **Reflect**, optionally write up to 120 characters, select a mood, and attach up to three images. Saving records the activity after the selected images have been stored. A photo storage error leaves the form open for retrying or saving without photos.
+Choose **Reflect**, optionally write up to 10,000 characters, select a mood, and attach up to three images. Saving records the activity after the selected images have been stored. A photo storage error leaves the form open for retrying or saving without photos.
 
 Photos are resized to a longest side of at most 1024 pixels and encoded as JPEG. The journal and Relics panel display thumbnails; selecting one opens the stored image in a new tab. Relics also lets you add or remove photos later, within the same three-image limit. Missing image data displays “Photo not on this device.”
 

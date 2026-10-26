@@ -140,7 +140,7 @@ test.describe('self-care', () => {
     await panel.getByRole('button', { name: 'Record Reflect, plus 5 LP' }).click()
 
     await panel.getByLabel(/One sentence about how you are today/).fill(text)
-    await expect(panel.getByText(`${text.length} / 120`)).toBeVisible()
+    await expect(panel.getByText(`${text.length} / 10000`)).toBeVisible()
     const calm = panel.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Calm' })
     await calm.click()
     await expect(calm).toHaveAttribute('aria-pressed', 'true')
@@ -168,14 +168,16 @@ test.describe('self-care', () => {
     await expect(relics).toBeHidden()
   })
 
-  test('reflection text stops at 120 characters', async ({ page }) => {
+  test('reflection text stops at 10,000 characters', async ({ page }) => {
     await enterTree(page)
     const panel = await openSelfCare(page)
     await panel.getByRole('button', { name: 'Record Reflect, plus 5 LP' }).click()
     const input = panel.getByLabel(/One sentence about how you are today/)
-    await input.pressSequentially('a'.repeat(130))
-    await expect(input).toHaveValue('a'.repeat(120))
-    await expect(panel.getByText('120 / 120')).toBeVisible()
+    await input.fill('a'.repeat(9_999))
+    await input.press('End')
+    await input.pressSequentially('bcd')
+    await expect(input).toHaveValue(`${'a'.repeat(9_999)}b`)
+    await expect(panel.getByText('10000 / 10000')).toBeVisible()
   })
 })
 

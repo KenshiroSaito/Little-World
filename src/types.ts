@@ -31,7 +31,7 @@ export type SelfCareLog = {
   date: string; // local YYYY-MM-DD
   createdAt: string; // ISO timestamp
   points: number; // 5
-  text?: string; // reflect only, max 120 chars
+  text?: string; // reflect only, max 10,000 chars
   mood?: MoodTag; // reflect only
   images?: string[]; // reflect only, ids of photos kept in IndexedDB (state/images.ts), at most 3
 };

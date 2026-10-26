@@ -59,14 +59,16 @@ describe('rewards', () => {
     expect(late.selfCareLogs[0].date).toBe('2026-10-25');
   });
 
-  it('keeps text and mood only for reflect, trimmed to 120 characters', () => {
+  it('keeps text and mood only for reflect, trimmed to 10,000 characters', () => {
     const walk = recordActivity(initialGameState, 'walk', at(1), { text: 'nice', mood: 'calm' });
     expect(walk.selfCareLogs[0].text).toBeUndefined();
-    const long = 'a'.repeat(200);
+    const long = 'a'.repeat(10_200);
     const reflect = recordActivity(initialGameState, 'reflect', at(1), { text: `  ${long} `, mood: 'tired' });
-    expect(reflect.selfCareLogs[0].text).toHaveLength(120);
+    expect(reflect.selfCareLogs[0].text).toHaveLength(10_000);
     expect(reflect.selfCareLogs[0].mood).toBe('tired');
     expect(inscriptions(reflect)).toHaveLength(1);
+    // A save holding the longest reflection still loads.
+    expect(isValidGameState(JSON.parse(JSON.stringify(reflect)))).toBe(true);
   });
 
   it('demo Next day moves "today" forward', () => {

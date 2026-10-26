@@ -1,7 +1,7 @@
 import type { ActivityId, GameState, MoodTag, SelfCareLog } from '../types';
 import { LP_PER_ACTIVITY } from './activities';
 
-export const MAX_REFLECTION_LENGTH = 120;
+export const MAX_REFLECTION_LENGTH = 10_000;
 /** Photos a reflection can keep. */
 export const MAX_REFLECTION_IMAGES = 3;
 

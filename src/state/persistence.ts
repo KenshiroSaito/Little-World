@@ -1,5 +1,5 @@
 import { validPurchases } from '../shop/inventory';
-import { MAX_REFLECTION_IMAGES } from '../game/rules';
+import { MAX_REFLECTION_IMAGES, MAX_REFLECTION_LENGTH } from '../game/rules';
 import { ACTIVITY_IDS, MOOD_TAGS, isCustomColor, type GameState, type SelfCareLog } from '../types';
 
 export const SAVE_KEY = 'littleworld:save';
@@ -17,7 +17,7 @@ function logValid(v: unknown): v is SelfCareLog {
     typeof v.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.date) &&
     typeof v.createdAt === 'string' && !Number.isNaN(Date.parse(v.createdAt)) &&
     v.points === 5 &&
-    (v.text === undefined || (typeof v.text === 'string' && v.text.length <= 120)) &&
+    (v.text === undefined || (typeof v.text === 'string' && v.text.length <= MAX_REFLECTION_LENGTH)) &&
     (v.mood === undefined || (MOOD_TAGS as readonly string[]).includes(v.mood as string)) &&
     (v.images === undefined || (v.activityId === 'reflect' && Array.isArray(v.images) && v.images.length <= MAX_REFLECTION_IMAGES &&
       v.images.every(id => typeof id === 'string' && id.length > 0)));
