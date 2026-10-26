@@ -41,6 +41,7 @@ export default function App() {
   const purchases = useMemo(() => state.shopPurchases ?? [], [state.shopPurchases]);
   const balance = shopBalance(game.totalLP, purchases);
   const outfit = useMemo(() => wornItems(purchases), [purchases]);
+  const relicIds = useMemo(() => game.revealedRelics.map((relic) => relic.id), [game.revealedRelics]);
   // Every reflection buries a keepsake at the tip of its root.
   const keepsakes = useMemo(
     () => state.selfCareLogs.filter((log) => log.activityId === "reflect").map((log) => log.id),
@@ -110,7 +111,7 @@ export default function App() {
         ref={canvas}
         onSelect={handleCanvasSelect}
         segments={game.segments}
-        revealedRelics={game.revealedRelics.map((relic) => relic.id)}
+        revealedRelics={relicIds}
         inscriptionCount={game.inscriptions.length}
         lp={game.totalLP}
         purchases={purchases}

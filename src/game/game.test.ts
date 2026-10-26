@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GameState } from '../types';
 import { gameReducer, initialGameState } from '../state/gameReducer';
-import { isValidGameState } from '../state/persistence';
+import { SAVE_KEY, isValidGameState, loadGame } from '../state/persistence';
 import { buildTree, rootDepth } from './buildTree';
 import { doneToday, localDate, recordActivity } from './rules';
 import { journalPages } from './journal';
@@ -173,6 +173,27 @@ describe('saving', () => {
     expect(isValidGameState(null)).toBe(false);
     expect(isValidGameState({ version: 3 })).toBe(false);
     expect(isValidGameState({ ...initialGameState, selfCareLogs: [{ id: 'x' }] })).toBe(false);
+  });
+
+  describe('loadGame', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+    const stored = (value: unknown) => vi.stubGlobal('localStorage', { getItem: (key: string) => (key === SAVE_KEY ? JSON.stringify(value) : null) });
+
+    it('keeps the tree when only the shop purchases no longer make sense', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const game = fullDays(2);
+      stored({ ...game, shopPurchases: [{ id: 'p', itemId: 'baubles/gone', price: 5, segmentId: null }] });
+      expect(loadGame()).toEqual(game);
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it('still starts over when the logs themselves are corrupt', () => {
+      stored({ ...fullDays(1), selfCareLogs: [{ id: 'x' }], shopPurchases: [] });
+      expect(loadGame()).toBeNull();
+    });
   });
 });
 

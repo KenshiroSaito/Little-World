@@ -3,7 +3,7 @@ import { ACTIVITIES } from "../game/activities";
 import { MOODS } from "../game/moods";
 import { MAX_REFLECTION_IMAGES, MAX_REFLECTION_LENGTH } from "../game/rules";
 import { useGame } from "../state/GameProvider";
-import { saveImage } from "../state/images";
+import { saveImages } from "../state/images";
 import type { MoodTag } from "../types";
 import ActivityIcon from "./ActivityIcon";
 import { PhotoPreview } from "./ReflectionImages";
@@ -27,7 +27,7 @@ export default function SelfCarePanel({ onClose }: Props) {
     setSaving(true);
     setPhotoError(false);
     try {
-      const images = await Promise.all(photos.map(saveImage));
+      const images = await saveImages(photos);
       record("reflect", { text, mood: mood || undefined, images });
       // Stay open: clear the form and fold Reflect back into its card.
       setText("");

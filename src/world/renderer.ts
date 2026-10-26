@@ -298,7 +298,8 @@ export class WorldRenderer {
       this.treeDirty = true
     }
     this.player ??= spawnPlayer(this.playerWorld)
-    if (segmentsChanged || JSON.stringify(next.keepsakes) !== JSON.stringify(prev.keepsakes)) {
+    const keepsakesChanged = JSON.stringify(next.keepsakes) !== JSON.stringify(prev.keepsakes)
+    if (segmentsChanged || keepsakesChanged) {
       const roots = new Map(next.segments.filter((s) => s.kind === 'root').map((s) => [s.id, s.to]))
       this.keepsakes = (next.keepsakes ?? []).flatMap((id) => {
         const at = roots.get(`${id}:r`)
@@ -310,7 +311,12 @@ export class WorldRenderer {
     if (next.barkColor !== prev.barkColor) this.treeDirty = true
     if (!this.growth) this.revealRelics(this.started)
     if (!next.spiritEnabled) this.onBlur()
-    this.overlayDirty = true
+    const overlayChanged =
+      segmentsChanged ||
+      keepsakesChanged ||
+      next.lp !== prev.lp ||
+      next.inscriptionCount !== prev.inscriptionCount
+    if (!this.started || overlayChanged) this.overlayDirty = true
     this.started = true
     if (this.needsFit && this.view.width > 0) this.fit(false)
   }
