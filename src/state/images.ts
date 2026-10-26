@@ -14,7 +14,10 @@ function database(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      opened = null;
+      reject(request.error);
+    };
   });
   return opened;
 }
@@ -54,6 +57,15 @@ export async function saveImage(file: Blob): Promise<string> {
   const id = crypto.randomUUID();
   await run('readwrite', store => store.put(blob, id));
   return id;
+}
+
+export async function saveImages(files: readonly Blob[]): Promise<string[]> {
+  const results = await Promise.allSettled(files.map(saveImage));
+  const kept = results.flatMap(r => (r.status === 'fulfilled' ? [r.value] : []));
+  const failed = results.find(r => r.status === 'rejected');
+  if (!failed) return kept;
+  await Promise.allSettled(kept.map(deleteImage));
+  throw failed.reason;
 }
 
 /** A kept photo, or null when it is missing (another browser, or cleared site data). */

@@ -3,7 +3,7 @@ import { MOODS } from "../game/moods";
 import { RELICS } from "../game/relics";
 import { MAX_REFLECTION_IMAGES } from "../game/rules";
 import { useGame } from "../state/GameProvider";
-import { deleteImage, saveImage } from "../state/images";
+import { deleteImage, saveImages } from "../state/images";
 import type { MoodTag, SelfCareLog } from "../types";
 import { leafShades } from "../world";
 import ReflectionImages from "./ReflectionImages";
@@ -105,7 +105,7 @@ function InscriptionPhotos({ log, onChange }: { log: SelfCareLog; onChange: (ima
     setSaving(true);
     setFailed(false);
     try {
-      const ids = await Promise.all(files.slice(0, room).map(saveImage));
+      const ids = await saveImages(files.slice(0, room));
       onChange([...images, ...ids]);
     } catch (error) {
       console.warn("Unable to keep the inscription's photos", error);

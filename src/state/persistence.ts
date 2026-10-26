@@ -44,7 +44,15 @@ export function loadGame(): GameState | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw === null) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isValidGameState(parsed) ? parsed : null;
+    if (isValidGameState(parsed)) return parsed;
+    if (object(parsed) && 'shopPurchases' in parsed) {
+      const { shopPurchases: dropped, ...rest } = parsed;
+      if (isValidGameState(rest)) {
+        console.warn('Dropped unreadable shop purchases from the saved game', dropped);
+        return rest;
+      }
+    }
+    return null;
   } catch (error) {
     console.warn('Unable to load saved game; starting a new one', error);
     return null;
