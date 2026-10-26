@@ -14,6 +14,7 @@ import DemoControls from "./components/DemoControls";
 import GrowBoost from "./components/GrowBoost";
 import TreeCanvas, { type TreeCanvasHandle } from "./world/TreeCanvas";
 import { useGame } from "./state/GameProvider";
+import { startMusic } from "./audio/sounds";
 import type { CanvasSelection, LeafColor } from "./types";
 import "./App.css";
 
@@ -95,7 +96,10 @@ export default function App() {
     return (
       <TitleScreen
         hasSave={state.selfCareLogs.length > 0}
-        onStart={() => setScreen("tree")}
+        onStart={() => {
+          startMusic();
+          setScreen("tree");
+        }}
       />
     );
   }

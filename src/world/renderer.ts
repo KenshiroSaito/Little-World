@@ -1,3 +1,4 @@
+import { playJump } from '../audio/sounds.ts'
 import { TreeDecorations } from '../shop/decorations';
 import type { ShopPurchase } from '../shop/inventory';
 import { DRESS, SpiritOutfit } from '../shop/outfit';
@@ -513,7 +514,10 @@ export class WorldRenderer {
     if (this.view.width === 0 || !this.started) return
 
     if (this.player && this.scene.spiritEnabled) {
+      const before = this.player.mode
       this.player = stepPlayer(this.player, this.input(), this.playerWorld, dt)
+      // A jump leaves the ground or a limb rising; stepping off a ledge falls instead.
+      if (before !== 'air' && this.player.mode === 'air' && this.player.vy < 0) playJump()
       this.tapped.clear()
       if (this.follow) this.followPlayer(dt)
     }

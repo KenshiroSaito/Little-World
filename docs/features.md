@@ -134,6 +134,12 @@ The spirit offers supportive messages based on recent activity counts and mood t
 
 Code: [`SpiritBubble.tsx`](../src/components/SpiritBubble.tsx), [`spirit.ts`](../src/game/spirit.ts), [`SettingsPanel.tsx`](../src/components/SettingsPanel.tsx), [`GameProvider.tsx`](../src/state/GameProvider.tsx).
 
+## Music and sound
+
+Choosing **Start** or **Continue** starts a background track that loops for the rest of the session. The spirit plays a jump sound each time it jumps off the ground or a limb; stepping off a ledge is silent. Browsers only allow audio after the player interacts with the page, which is why the music waits for the title screen's button.
+
+Code: [`sounds.ts`](../src/audio/sounds.ts), [`App.tsx`](../src/App.tsx), [`renderer.ts`](../src/world/renderer.ts).
+
 ## Demo and quick growth
 
 **Grow ×10** is available in the normal tree view. Each press creates ten real activity records, cycling through the four activities: 50 lifetime LP plus ten branches and roots. These records are saved, appear in the journal, unlock colours, and count toward shop funds and milestones. Its displayed press counter is temporary.
