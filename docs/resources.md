@@ -14,6 +14,7 @@
 | Generated atlas layout | [`artLayout.ts`](../src/world/artLayout.ts) | Animation cells/rows and tree-kit rectangles used to sample atlas images. |
 | Procedural pixel sprites | [`sprites.ts`](../src/world/sprites.ts) | Small sprite definitions, outlines and halos; additional world objects are drawn directly in terrain, houses and overlay code. |
 | Public icons | [`public/`](../public) | `favicon.svg` and `icons.svg`. |
+| Music and sound effects | [`src/audio/`](../src/audio) | `lovely-garden.mp3` loops in the background from Start; `jump.mp3` plays when the spirit jumps. Played by `sounds.ts`. |
 | Additional bundled artwork | [`src/assets/`](../src/assets) | `hero.png`, `react.svg` and `vite.svg` are present; this directory is separate from the world/shop art catalogs. |
 
 ### Trinket categories
@@ -65,6 +66,7 @@ Exact installed versions are recorded in [`package-lock.json`](../package-lock.j
 | TypeScript and type packages | Shared contracts and type-checking. |
 | Vite and its React plugin | Development server, asset imports/globs, bundling and production output. |
 | Vitest | Game, world and shop tests. |
+| Playwright | End-to-end tests of the main page in a real browser. |
 | ESLint, TypeScript ESLint, React Hooks/Refresh plugins | Static checks for source and React patterns. |
 | [`tsconfig.json`](../tsconfig.json), [`tsconfig.app.json`](../tsconfig.app.json), [`tsconfig.node.json`](../tsconfig.node.json) | TypeScript project references and browser/tool configuration. |
 | [`eslint.config.js`](../eslint.config.js) | Lint rules and file scope. |
@@ -76,7 +78,9 @@ For browser support, the code uses canvas, ResizeObserver, Pointer Events, anima
 
 [`vite.config.ts`](../vite.config.ts) enables React and uses `base: './'` so generated asset paths are relative, including when served from a repository subpath. `npm run build` runs TypeScript project builds followed by Vite and writes `dist/`. `npm run preview` serves that output locally.
 
-[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) runs on pushes to `main` and manual dispatch. It checks out the repository, sets up Node.js 22, runs `npm ci` and `npm run build`, then uses the workflow's GitHub token to publish `dist/` to the `gh-pages` branch. The workflow has write access to repository contents and serializes deployments through its `pages` concurrency group. Hosting still depends on the repository's GitHub Pages settings.
+GitHub Pages serves the `main` branch root as it is; there is no separate deployment branch. [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) runs on pushes to `main` and manual dispatch. It sets up Node.js 22, runs `npm ci` and `npm run build`, copies `dist/` to `play/` and commits it to `main` when the build changed. On `github.io`, a small script in the root [`index.html`](../index.html) sends visitors to `play/`; locally it does nothing. A root `.nojekyll` file stops Pages from running Jekyll over the repository. Do not edit `play/` by hand: the next build replaces it. After pushing, pull to pick up the build commit.
+
+[`playwright.config.ts`](../playwright.config.ts) and [`e2e/`](../e2e) hold end-to-end tests of the main page. `npm run test:e2e` runs them against the live site; set `BASE_URL` to test another copy, such as `BASE_URL=http://localhost:4173/ npm run test:e2e` while `npm run preview` is running. Run `npx playwright install chromium` once to download the test browser.
 
 ## Resource maintenance
 

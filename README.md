@@ -45,6 +45,7 @@ Student life comes with deadlines, exams, part-time jobs, moving away from home 
 - **Paint mode**: recolour any leaf cluster with unlocked colours or your own RGB mix, with undo.
 - **Shop**: spend LP on trinkets for the branches and accessories for the spirit. Your LP total never goes down.
 - **Settings**: turn the spirit's messages on or off, reduce motion, and reset your save.
+- **Music and sound**: a looping background track, and a jump sound for the spirit.
 
 ### Controls
 
@@ -93,8 +94,9 @@ Open the local URL printed by Vite, then choose **Start** or **Continue**. The g
 | `npm run lint` | Run ESLint. |
 | `npm test` | Run Vitest in watch mode. |
 | `npm test -- --run` | Run the test suite once. |
+| `npm run test:e2e` | Run the end-to-end tests against the live site (set `BASE_URL` to test another copy). |
 
-The GitHub Actions workflow builds pushes to `main` and publishes `dist/` to the `gh-pages` branch. See [deployment resources](docs/resources.md#build-and-deployment).
+The GitHub Actions workflow builds pushes to `main` and commits the build to `play/` on `main`, which GitHub Pages serves. See [deployment resources](docs/resources.md#build-and-deployment).
 
 ## Tech stack
 

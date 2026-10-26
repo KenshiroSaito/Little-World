@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // GitHub Pages serves the main branch as it is, where this page is the unbuilt
+      // source: open the built game, which the deploy workflow keeps in play/.
+      if (location.hostname.endsWith('github.io') && !location.pathname.includes('/play/')) {
+        location.replace('play/' + location.search + location.hash)
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+    <title>little-world</title>
+    <script type="module" crossorigin src="./assets/index-JieUu5Un.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B7i5yZ2R.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

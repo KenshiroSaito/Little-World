@@ -1,5 +1,7 @@
 name: Deploy to GitHub Pages
 
+# GitHub Pages serves the main branch as it is, so the built game is committed
+# to play/ on main; the root index.html sends visitors there.
 on:
   push:
     branches: [main]
@@ -26,8 +28,13 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - name: Publish dist to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+      - name: Commit the build to play/
+        run: |
+          rm -rf play
+          cp -r dist play
+          git add -A play
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish build of ${GITHUB_SHA::7}"
+          git push
